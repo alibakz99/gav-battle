@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Кто кого перегавкает</title>
+<meta name="theme-color" content="#14161f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;600;800&display=swap">
+<style>
+/* Тёмная игровая сцена: вечерняя Астана, рыжая акита, две команды — тёплая и холодная */
+:root{
+  --ink:#14161f; --card:#1f2333; --card2:#2a2f44; --line:#3a4060;
+  --cream:#f5efe6; --muted:#a9adc4;
+  --gold:#f2b33d; --left:#ff9f43; --right:#4cc9f0;
+  --ok:#5bd28a; --bad:#ff5d6c;
+  --display:"Rubik Mono One","Arial Black",system-ui,sans-serif;
+  --body:"Rubik",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--cream);font:16px/1.4 var(--body);-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:0;border-radius:14px;padding:14px 18px;background:var(--card2);font-weight:600}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn-main{background:var(--gold);color:var(--ink);font-weight:800}
+input{font:inherit;color:var(--cream);background:var(--card2);border:2px solid var(--line);border-radius:12px;padding:12px 14px;width:100%}
+h1,h2{margin:0;text-wrap:balance}
+.screen{min-height:100%;padding-block:24px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;align-items:center}
+.col{width:100%;max-width:460px;display:flex;flex-direction:column;gap:16px}
+.logo{font-family:var(--display);font-size:clamp(26px,7vw,44px);line-height:1.05;letter-spacing:.01em;text-align:center}
+.logo span{color:var(--gold)}
+.sub{color:var(--muted);text-align:center}
+.card{background:var(--card);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.label{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.big-choice{display:flex;flex-direction:column;gap:12px}
+.big-choice button{padding:20px;font-size:18px;text-align:left;display:flex;gap:14px;align-items:center}
+.big-choice small{display:block;font-weight:400;color:var(--muted);font-size:14px}
+.ico{font-size:30px}
+.skins{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.skin{padding:6px 2px 8px;background:var(--card2);border:2px solid transparent;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600}
+.skin canvas{width:100%;max-width:72px;aspect-ratio:1/0.8}
+.skin[aria-pressed="true"]{border-color:var(--gold);background:#3a3322}
+/* микрофон */
+.mic{border:2px solid var(--line)}
+.mic.ok{border-color:var(--ok)}
+.mic.bad{border-color:var(--bad)}
+.mic-status{display:flex;gap:10px;align-items:center;font-weight:600}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+.ok .dot{background:var(--ok)} .bad .dot{background:var(--bad)}
+.help{background:#2b1d24;border-radius:12px;padding:12px 14px;font-size:15px}
+.help ol{margin:6px 0 0;padding-left:20px}
+.help li{margin:4px 0}
+.meter{height:18px;background:var(--card2);border-radius:9px;overflow:hidden;position:relative}
+.meter i{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,var(--ok),var(--gold),var(--left));border-radius:9px;transition:width .05s linear}
+.meter b{position:absolute;top:0;bottom:0;width:2px;background:var(--cream);opacity:.6}
+.err{color:var(--bad);font-weight:600}
+/* экран игрока */
+.ptop{display:flex;justify-content:space-between;align-items:center;width:100%;max-width:460px;font-weight:600;color:var(--muted)}
+.role{font-family:var(--display);font-size:22px;text-align:center}
+#pDog{width:100%;max-width:360px;aspect-ratio:1.25/1;align-self:center}
+.pstate{font-family:var(--display);font-size:clamp(22px,7vw,34px);text-align:center;line-height:1.1;min-height:1.2em}
+.pnote{text-align:center;color:var(--muted);min-height:1.4em}
+.tug{height:22px;border-radius:11px;position:relative;overflow:hidden;background:var(--right)}
+.tug i{position:absolute;inset:0 auto 0 0;background:var(--left);width:50%}
+.tug em{position:absolute;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;font-style:normal;font-size:22px;line-height:30px;text-align:center}
+.stats{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;font-weight:600}
+#rdyBtn{padding:22px;font-size:20px}
+#rdyBtn.on{background:var(--ok);color:var(--ink)}
+/* ТВ */
+#host{position:fixed;inset:0;background:var(--ink)}
+#stage{position:absolute;inset:0;width:100%;height:100%;display:block}
+#qrCard{position:absolute;left:max(2vw,env(safe-area-inset-left,0px));top:3vh;background:#fff;color:var(--ink);border-radius:2vh;padding:2vh;display:flex;flex-direction:column;align-items:center;gap:1vh;width:min(26vh,30vw)}
+#qr{width:100%;aspect-ratio:1}
+#qr img,#qr canvas{width:100%!important;height:auto!important;display:block}
+#qrCode{font-family:var(--display);font-size:4.6vh;letter-spacing:.08em;line-height:1}
+#qrHint{font-size:1.7vh;font-weight:600;text-align:center;line-height:1.2}
+#qrUrl{font-size:1.3vh;color:#555;word-break:break-all;text-align:center}
+#qrCard.small{width:13vh;padding:1vh;gap:.4vh;top:2vh}
+#qrCard.small #qrCode{font-size:2.2vh}
+#qrCard.small #qrHint,#qrCard.small #qrUrl{display:none}
+#hostBar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(1.5vh + env(safe-area-inset-bottom,0px));display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;background:rgba(20,22,31,.85);padding:8px;border-radius:16px;transition:opacity .4s;max-width:96vw}
+#hostBar button{padding:10px 14px;font-size:15px}
+#hostBar .seg{display:flex;gap:2px;background:var(--card);border-radius:12px;padding:2px}
+#hostBar .seg button{padding:8px 10px;border-radius:10px;background:transparent}
+#hostBar .seg button[aria-pressed="true"]{background:var(--gold);color:var(--ink)}
+#hostBar.hide{opacity:0;pointer-events:none}
+#netState{font-size:13px;color:var(--muted);padding:0 6px}
+#trainMic{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,22,31,.92);padding:16px}
+@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+</style>
+</head>
+<body>
+
+<!-- ГЛАВНОЕ МЕНЮ -->
+<section id="menu" class="screen">
+  <div class="col">
+    <div class="logo">КТО КОГО<br><span>ПЕРЕГАВКАЕТ</span></div>
+    <p class="sub">Двое лают в телефоны. Чей лай громче и дольше, тот перетягивает косточку.</p>
+    <div class="big-choice">
+      <button id="goHost" class="btn-main"><span class="ico">📺</span><span>Экран для трансляции<small style="color:#4a3a14">Открой на ноутбуке у телевизора</small></span></button>
+      <button id="goJoin"><span class="ico">📱</span><span>Я игрок<small>Войти по коду комнаты</small></span></button>
+      <button id="goTrain"><span class="ico">🤖</span><span>Тренировка с ботом<small>Проверить игру одному</small></span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ВХОД ИГРОКА -->
+<section id="join" class="screen" hidden>
+  <div class="col">
+    <div class="logo" style="font-size:26px">КТО КОГО <span>ПЕРЕГАВКАЕТ</span></div>
+    <div class="card">
+      <label class="label" for="codeIn">Код комнаты</label>
+      <input id="codeIn" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Например, K7QF" style="font-family:var(--display);letter-spacing:.15em;text-transform:uppercase">
+      <label class="label" for="nickIn">Твоё имя</label>
+      <input id="nickIn" maxlength="16" autocomplete="nickname" placeholder="Имя на экране">
+      <span class="label">Собака</span>
+      <div class="skins" id="skinsJoin"></div>
+    </div>
+    <div id="micBoxJoin"></div>
+    <button id="joinBtn" class="btn-main" style="padding:18px;font-size:18px">Войти в игру</button>
+    <p id="joinErr" class="err" role="alert"></p>
+  </div>
+</section>
+
+<!-- ТЕЛЕФОН ИГРОКА -->
+<section id="player" class="screen" hidden>
+  <div class="ptop"><span id="pCode"></span><span id="pNet">● на связи</span></div>
+  <div class="col" style="gap:12px">
+    <div class="role" id="pRole">Подключаюсь…</div>
+    <canvas id="pDog"></canvas>
+    <div class="meter" aria-label="Громкость"><i id="pMeter"></i><b id="pGate"></b></div>
+    <div class="pstate" id="pState"></div>
+    <div class="pnote" id="pNote"></div>
+    <div id="pGame" hidden class="card" style="gap:8px">
+      <div class="tug"><i id="pTugL"></i><em id="pBone">🦴</em></div>
+      <div class="stats"><span id="pMe"></span><span id="pTime"></span><span id="pThem"></span></div>
+    </div>
+    <div id="micBoxPlay"></div>
+    <button id="rdyBtn" class="btn-main">Я готов</button>
+  </div>
+</section>
+
+<!-- ЭКРАН ТВ -->
+<section id="host" hidden>
+  <canvas id="stage"></canvas>
+  <div id="qrCard" hidden>
+    <div id="qr"></div>
+    <div id="qrCode">····</div>
+    <div id="qrHint">Сканируй камерой телефона</div>
+    <div id="qrUrl"></div>
+  </div>
+  <div id="hostBar">
+    <span id="netState">Запуск…</span>
+    <div class="seg" role="group" aria-label="Длительность раунда">
+      <button data-dur="15">15 с</button><button data-dur="30" aria-pressed="true">30 с</button><button data-dur="60">60 с</button>
+    </div>
+    <button id="hStart" class="btn-main">Старт</button>
+    <button id="hSwap">Сменить игроков</button>
+    <button id="hSound">🔊</button>
+    <button id="hFull">⛶</button>
+    <button id="hExit">Выход</button>
+  </div>
+  <div id="trainMic" hidden>
+    <div class="col">
+      <div class="logo" style="font-size:24px">ТРЕНИРОВКА</div>
+      <p class="sub">Ты слева, бот справа. Включи микрофон и лай.</p>
+      <div class="card"><span class="label">Собака</span><div class="skins" id="skinsTrain"></div></div>
+      <div id="micBoxTrain"></div>
+      <button id="trainGo" class="btn-main" disabled>Начать</button>
+    </div>
+  </div>
+</section>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+"use strict";
+/* ================== общие утилиты ================== */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const now = () => performance.now();
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('gav_'+k); return v === null ? d : v; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('gav_'+k, v); }catch(e){} }
+};
+function show(id){ for (const s of ['menu','join','player','host']) $(s).hidden = (s !== id); }
+const ID_PREFIX = 'gavbattle-kz-';
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function genCode(){ let s=''; for(let i=0;i<4;i++) s += CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]; return s; }
+function cleanCode(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4); }
+function cleanNick(s){ return String(s||'').replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,16); }
+let clientId = store.get('cid', '');
+if (!clientId){ clientId = Math.random().toString(36).slice(2,12); store.set('cid', clientId); }
+
+let wakeLock = null;
+async function keepAwake(){ try{ if ('wakeLock' in navigator && !wakeLock){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', ()=>{ wakeLock=null; }); } }catch(e){} }
+document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='visible' && (mode==='host'||mode==='player'||mode==='train')) keepAwake(); });
+
+/* ================== скины ================== */
+const SKINS = [
+  {name:'Хатико', body:'#d9873e', light:'#f7ecdc', dark:'#a65f23', inner:'#f3c7a0', nose:'#2a1d17', eye:'#2a1d17'},
+  {name:'Белая',  body:'#efe9df', light:'#ffffff', dark:'#cfc4b3', inner:'#f2c9c2', nose:'#2a1d17', eye:'#2a1d17'},
+  {name:'Сиба',   body:'#e06a2a', light:'#fbefe2', dark:'#b04c17', inner:'#f6b98d', nose:'#2a1d17', eye:'#2a1d17'},
+  {name:'Хаски',  body:'#5e6772', light:'#f7f7f5', dark:'#3c434c', inner:'#d9b4b4', nose:'#1c1c1c', eye:'#46a6ea'},
+  {name:'Чёрный', body:'#2f2a2b', light:'#d99a55', dark:'#1a1617', inner:'#7a5a50', nose:'#111', eye:'#3b2414'}
+];
+const GHOST = {body:'rgba(255,255,255,.10)', light:'rgba(255,255,255,.14)', dark:'rgba(255,255,255,.07)', inner:'rgba(255,255,255,.1)', nose:'rgba(255,255,255,.2)', eye:'rgba(255,255,255,.25)'};
+const skinIdx = v => clamp(Math.floor(+v||0), 0, SKINS.length-1);
+
+/* ================== рисуем собаку ================== */
+function ell(c,x,y,rx,ry){ c.beginPath(); c.ellipse(x,y,rx,ry,0,0,Math.PI*2); }
+function rr(c,x,y,w,h,r){ c.beginPath(); c.roundRect ? c.roundRect(x,y,w,h,r) : c.rect(x,y,w,h); c.fill(); }
+function tri(c,a,b,d,e,f,g,col){ c.fillStyle=col; c.beginPath(); c.moveTo(a,b); c.lineTo(d,e); c.lineTo(f,g); c.closePath(); c.fill(); }
+// x,y — точка на земле под собакой; s — масштаб (собака ~200 единиц длиной); open 0..1 — пасть
+function drawDog(c, x, y, s, sk, open, t, flip){
+  c.save(); c.translate(x, y); c.scale(flip ? -s : s, s);
+  c.fillStyle = 'rgba(0,0,0,.28)'; ell(c, 0, 0, 74, 8); c.fill();
+  c.fillStyle = sk.dark; rr(c,-52,-46,18,46,8); rr(c,18,-46,18,46,8);
+  c.fillStyle = sk.body; rr(c,-38,-46,18,46,8); rr(c,34,-46,18,46,8);
+  c.fillStyle = sk.light; rr(c,-38,-11,18,11,5); rr(c,34,-11,18,11,5);
+  c.translate(0, -open*6);
+  // хвост бубликом
+  c.save(); c.translate(-58,-82); c.rotate(Math.sin(t*14)*0.22*(0.25+open));
+  c.lineCap='round'; c.strokeStyle=sk.body; c.lineWidth=16; c.beginPath(); c.arc(0,-14,16,Math.PI*0.55,Math.PI*2.25); c.stroke();
+  c.strokeStyle=sk.light; c.lineWidth=5; c.beginPath(); c.arc(0,-14,16,Math.PI*1.15,Math.PI*2.05); c.stroke();
+  c.restore();
+  c.fillStyle = sk.body; ell(c,0,-62,70,32); c.fill();
+  c.fillStyle = sk.light; ell(c,34,-47,34,18); c.fill();
+  c.fillStyle = sk.body; ell(c,52,-86,26,32); c.fill();
+  c.fillStyle = sk.light; ell(c,63,-72,15,20); c.fill();
+  // голова
+  c.save(); c.translate(70,-110); c.rotate(-open*0.22);
+  tri(c,-20,-14,-8,-46,4,-20,sk.body); tri(c,-14,-19,-8,-37,-1,-21,sk.inner);
+  tri(c,4,-22,16,-48,24,-14,sk.body); tri(c,9,-22,16,-38,20,-17,sk.inner);
+  c.fillStyle = sk.body; c.beginPath(); c.arc(0,0,28,0,Math.PI*2); c.fill();
+  c.fillStyle = sk.light; ell(c,6,12,22,13); c.fill();
+  const a = open*0.8, jx = 18+34*Math.cos(a), jy = 10+34*Math.sin(a);
+  if (open > 0.04){
+    c.fillStyle='#5b1a1f'; c.beginPath(); c.moveTo(16,6); c.lineTo(50,1); c.lineTo(jx,jy); c.lineTo(16,14); c.closePath(); c.fill();
+    c.fillStyle='#e86f7d'; ell(c, 18+22*Math.cos(a*0.8), 9+22*Math.sin(a*0.8), 10, 4); c.fill();
+  }
+  c.save(); c.translate(18,10); c.rotate(a); c.fillStyle=sk.light; ell(c,15,2,18,6); c.fill(); c.restore();
+  c.fillStyle = sk.light; ell(c,30,1,21,10); c.fill();
+  c.fillStyle = sk.nose; c.beginPath(); c.arc(50,-2,5.5,0,Math.PI*2); c.fill();
+  c.fillStyle = sk.eye; c.beginPath(); c.arc(13,-8,3.8,0,Math.PI*2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(14.3,-9.3,1.2,0,Math.PI*2); c.fill();
+  c.fillStyle = sk.light; ell(c,10,-17,4,2.4); c.fill();
+  c.restore(); c.restore();
+}
+// где у собаки пасть в координатах экрана
+function mouthPos(x, y, s, flip, open){ return {x: x + (flip?-1:1)*122*s, y: y - (112 + open*6)*s}; }
+
+function fitCanvas(cv){
+  const dpr = Math.min(window.devicePixelRatio||1, 2), r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width*dpr)), h = Math.max(1, Math.round(r.height*dpr));
+  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  const c = cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); return {c, w:r.width, h:r.height};
+}
+
+/* выбор скина */
+let mySkin = skinIdx(store.get('skin', 0));
+function buildSkins(holderId){
+  const holder = $(holderId); holder.innerHTML = '';
+  SKINS.forEach((sk, i) => {
+    const b = document.createElement('button'); b.className='skin'; b.type='button';
+    b.setAttribute('aria-pressed', i===mySkin ? 'true':'false');
+    const cv = document.createElement('canvas'); const t = document.createElement('span'); t.textContent = sk.name;
+    b.append(cv, t); holder.append(b);
+    b.onclick = () => { mySkin = i; store.set('skin', i); for (const x of holder.children) x.setAttribute('aria-pressed','false'); b.setAttribute('aria-pressed','true'); if (net.conn) send({t:'prof', nick:myNick(), skin:mySkin}); };
+    requestAnimationFrame(()=>{ const {c,w,h} = fitCanvas(cv); c.clearRect(0,0,w,h); drawDog(c, w*0.44, h*0.94, w/250, sk, 0, 0, false); });
+  });
+}
+function myNick(){ return cleanNick($('nickIn').value) || 'Игрок'; }
+
+/* ================== микрофон ================== */
+const Mic = { stream:null, ctx:null, an:null, buf:null, level:0, floor:0.15, power:0, active:false, status:'idle', err:'' };
+function envInfo(){
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  const android = /Android/i.test(ua);
+  const inapp = /Instagram|FBAN|FBAV|BytedanceWebview|musical_ly|Line\//i.test(ua);
+  let browser = 'other';
+  if (ios) browser = /CriOS/.test(ua) ? 'chrome' : /FxiOS/.test(ua) ? 'firefox' : /EdgiOS/.test(ua) ? 'edge' : 'safari';
+  else if (/SamsungBrowser/.test(ua)) browser = 'samsung';
+  else if (/Edg\//.test(ua)) browser = 'edge';
+  else if (/Firefox/.test(ua)) browser = 'firefox';
+  else if (/Chrome/.test(ua)) browser = 'chrome';
+  else if (/Safari/.test(ua)) browser = 'safari';
+  return {ios, android, inapp, browser, desktop: !ios && !android};
+}
+function micHelpHTML(){
+  const e = envInfo();
+  if (e.inapp) return '<b>Ты открыл ссылку внутри Instagram или другого приложения.</b> Там микрофон часто не работает.<ol><li>Нажми ⋯ в углу.</li><li>Выбери «Открыть в браузере» (Safari или Chrome).</li></ol>';
+  if (e.ios && e.browser==='safari') return '<b>Как разрешить микрофон в Safari на iPhone:</b><ol><li>Нажми «аА» слева в адресной строке.</li><li>Открой «Настройки веб-сайта».</li><li>Микрофон → «Разрешить».</li><li>Нажми кнопку «Проверить снова» ниже.</li></ol>Если не помогло: Настройки iPhone → Приложения → Safari → Микрофон → «Спросить» или «Разрешить».';
+  if (e.ios) return '<b>Как разрешить микрофон на iPhone:</b><ol><li>Открой Настройки iPhone.</li><li>Найди приложение браузера (' + (e.browser==='chrome'?'Chrome':e.browser==='firefox'?'Firefox':'Edge') + ').</li><li>Включи «Микрофон».</li><li>Вернись сюда и нажми «Проверить снова».</li></ol>';
+  if (e.android && e.browser==='samsung') return '<b>Как разрешить микрофон в Samsung Internet:</b><ol><li>Нажми на значок замка слева от адреса.</li><li>Разрешения → Микрофон → «Разрешить».</li><li>Нажми «Проверить снова».</li></ol>Если пункта нет: Настройки телефона → Приложения → Samsung Internet → Разрешения → Микрофон.';
+  if (e.android) return '<b>Как разрешить микрофон в Chrome на Android:</b><ol><li>Нажми на значок слева от адреса сайта.</li><li>Разрешения → Микрофон → «Разрешить».</li><li>Нажми «Проверить снова».</li></ol>Если не помогло: Настройки телефона → Приложения → Chrome → Разрешения → Микрофон → «Разрешить».';
+  if (e.browser==='safari') return '<b>Как разрешить микрофон в Safari на Mac:</b><ol><li>Меню Safari → «Настройки для этого веб-сайта».</li><li>Микрофон → «Разрешить».</li><li>Нажми «Проверить снова».</li></ol>';
+  return '<b>Как разрешить микрофон:</b><ol><li>Нажми на значок замка слева от адреса сайта.</li><li>Микрофон → «Разрешить».</li><li>Нажми «Проверить снова».</li></ol>Если микрофон запрещён в системе: Windows — Параметры → Конфиденциальность → Микрофон; Mac — Системные настройки → Конфиденциальность → Микрофон.';
+}
+async function micPermission(){
+  try{ const r = await navigator.permissions.query({name:'microphone'}); return r; }catch(e){ return null; }
+}
+async function micStart(){
+  Mic.err = '';
+  if (!window.isSecureContext){ Mic.status='insecure'; throw new Error('insecure'); }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ Mic.status = envInfo().inapp ? 'inapp' : 'unsupported'; throw new Error(Mic.status); }
+  try{
+    if (Mic.stream){ Mic.stream.getTracks().forEach(t=>t.stop()); Mic.stream=null; }
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    Mic.stream = stream;
+    if (!Mic.ctx){ const AC = window.AudioContext || window.webkitAudioContext; Mic.ctx = new AC(); }
+    await Mic.ctx.resume();
+    const src = Mic.ctx.createMediaStreamSource(stream);
+    Mic.an = Mic.ctx.createAnalyser(); Mic.an.fftSize = 1024; src.connect(Mic.an);
+    Mic.buf = new Float32Array(Mic.an.fftSize);
+    Mic.active = true; Mic.status = 'on';
+    stream.getAudioTracks().forEach(tr => tr.addEventListener('ended', ()=>{ Mic.active=false; Mic.status='lost'; Mic.power=0; Mic.level=0; micChanged(); }));
+  }catch(e){
+    Mic.active = false;
+    const n = e && e.name || '';
+    if (n==='NotAllowedError' || n==='PermissionDeniedError' || n==='SecurityError') Mic.status = 'denied';
+    else if (n==='NotFoundError' || n==='DevicesNotFoundError' || n==='OverconstrainedError') Mic.status = 'nomic';
+    else if (n==='NotReadableError' || n==='TrackStartError' || n==='AbortError') Mic.status = 'busy';
+    else { Mic.status = 'error'; Mic.err = n || String(e); }
+  }
+  micChanged();
+}
+// уровень 0..1 по громкости в дБ, порог шума следует за тишиной в зале
+function micRead(){
+  if (!Mic.active || !Mic.an){ Mic.level = 0; Mic.power = 0; return; }
+  if (Mic.an.getFloatTimeDomainData) Mic.an.getFloatTimeDomainData(Mic.buf);
+  else { const b = new Uint8Array(Mic.buf.length); Mic.an.getByteTimeDomainData(b); for (let i=0;i<b.length;i++) Mic.buf[i] = (b[i]-128)/128; }
+  let sum = 0; for (let i=0;i<Mic.buf.length;i++){ const v = Mic.buf[i]; sum += v*v; }
+  const rms = Math.sqrt(sum/Mic.buf.length) + 1e-9;
+  const lv = clamp((20*Math.log10(rms) + 60) / 50, 0, 1);
+  Mic.level = lv > Mic.level ? lv : Mic.level*0.8 + lv*0.2;
+  if (Mic.calib) Mic.calib.push(lv);
+  else if (lv < Mic.floor) Mic.floor = Mic.floor*0.9 + lv*0.1; else Mic.floor += (lv - Mic.floor)*0.0015;
+  const gate = micGate();
+  Mic.power = Mic.level > gate ? clamp((Mic.level - gate)/(1 - gate), 0, 1) : 0;
+}
+function micGate(){ return clamp(Mic.floor + 0.14, 0.14, 0.7); }
+function micCalibStart(){ Mic.calib = []; }
+function micCalibEnd(){ if (Mic.calib && Mic.calib.length > 5){ const a = Mic.calib.slice().sort((x,y)=>x-y); Mic.floor = a[Math.floor(a.length*0.6)]; } Mic.calib = null; }
+
+const micBoxes = [];
+function mountMicBox(holderId, opts={}){
+  const box = {el:$(holderId), opts}; micBoxes.push(box); renderMicBox(box); return box;
+}
+const MIC_TEXT = {
+  idle:    ['Микрофон ещё не включён', ''],
+  prompt:  ['Нужно разрешение на микрофон', 'Нажми кнопку, браузер спросит разрешение. Выбери «Разрешить».'],
+  granted: ['Микрофон разрешён', 'Нажми кнопку, чтобы включить его.'],
+  on:      ['Микрофон работает', 'Скажи «ГАВ!» — полоска должна прыгнуть.'],
+  denied:  ['Доступ к микрофону запрещён', ''],
+  nomic:   ['Микрофон не найден', 'Проверь, что у устройства есть микрофон и он не отключён.'],
+  busy:    ['Микрофон занят', 'Закрой звонок, диктофон или другое приложение, которое использует микрофон, и нажми «Проверить снова».'],
+  lost:    ['Микрофон отключился', 'Возможно, был звонок. Нажми «Проверить снова».'],
+  insecure:['Сайт открыт без https', 'Микрофон работает только на защищённых сайтах. Открой ссылку, которая начинается с https://'],
+  inapp:   ['Браузер внутри приложения', ''],
+  unsupported:['Браузер не поддерживает микрофон', 'Открой игру в Safari или Chrome.'],
+  error:   ['Не получилось включить микрофон', 'Нажми «Проверить снова». Если не поможет, перезагрузи страницу.']
+};
+function renderMicBox(box){
+  const st = Mic.status, [title, hint] = MIC_TEXT[st] || MIC_TEXT.error;
+  const good = st==='on', bad = ['denied','nomic','busy','lost','insecure','inapp','unsupported','error'].includes(st);
+  if (good && box.opts.noMeter){ box.el.innerHTML = ''; box.meter = null; return; }
+  const showHelp = st==='denied' || st==='inapp';
+  const btnText = st==='on' ? '' : (bad ? 'Проверить снова' : 'Включить микрофон');
+  box.el.innerHTML =
+    '<div class="card mic ' + (good?'ok':bad?'bad':'') + '">' +
+      '<div class="mic-status"><span class="dot"></span><span>🎤 ' + title + '</span></div>' +
+      (hint ? '<div class="sub" style="text-align:left">' + hint + '</div>' : '') +
+      (showHelp ? '<div class="help">' + micHelpHTML() + '</div>' : '') +
+      (good && !box.opts.noMeter ? '<div class="meter"><i></i><b></b></div>' : '') +
+      (btnText ? '<button type="button" class="' + (bad?'':'btn-main') + '">' + btnText + '</button>' : '') +
+      (st==='denied' ? '<button type="button" data-reload>Обновить страницу</button>' : '') +
+      (Mic.err ? '<div class="err">Ошибка: ' + Mic.err.replace(/[<>&]/g,'') + '</div>' : '') +
+    '</div>';
+  const b = box.el.querySelector('button:not([data-reload])'); if (b) b.onclick = () => { b.disabled = true; b.textContent = 'Жду ответа браузера…'; micStart(); };
+  const r = box.el.querySelector('[data-reload]'); if (r) r.onclick = () => location.reload();
+  box.meter = box.el.querySelector('.meter i'); box.gate = box.el.querySelector('.meter b');
+}
+function micChanged(){
+  micBoxes.forEach(renderMicBox);
+  if (net.conn) send({t:'mic', m: Mic.status==='on' ? 'ok' : Mic.status});
+  if (mode==='train') $('trainGo').disabled = Mic.status !== 'on';
+  if (mode==='player') updateReadyBtn();
+}
+async function micInitStatus(){
+  if (Mic.active) return micChanged();
+  if (!window.isSecureContext){ Mic.status='insecure'; return micChanged(); }
+  if (envInfo().inapp){ Mic.status='inapp'; return micChanged(); }
+  const p = await micPermission();
+  if (p){
+    Mic.status = p.state==='denied' ? 'denied' : p.state==='granted' ? 'granted' : 'prompt';
+    p.onchange = () => { if (!Mic.active){ Mic.status = p.state==='denied' ? 'denied' : p.state==='granted' ? 'granted' : 'prompt'; micChanged(); } else if (p.state==='denied'){ Mic.active=false; Mic.status='denied'; micChanged(); } };
+  } else Mic.status = 'prompt';
+  micChanged();
+}
+// анимация полосок громкости
+setInterval(()=>{
+  if (mode==='player' || mode==='join' || (mode==='train' && !players.has('me'))){ micRead(); }
+  for (const b of micBoxes){ if (b.meter){ b.meter.style.width = (Mic.level*100).toFixed(1)+'%'; b.gate.style.left = (micGate()*100).toFixed(1)+'%'; } }
+}, 40);
+
+/* ================== сеть ================== */
+const net = { peer:null, conn:null, code:'', retry:null, lastSt:0 };
+function send(m){ try{ if (net.conn && net.conn.open) net.conn.send(m); }catch(e){} }
+
+/* ================== режим ================== */
+let mode = 'menu';
+
+/* ================== ЭКРАН ТВ (ведущий) ================== */
+const G = { ph:'lobby', pos:0, dur:30, cntAt:0, endAt:0, win:null, L:null, R:null, overAt:0 };
+const players = new Map(); // id -> игрок
+const pops = [], confetti = [];
+let sound = true;
+const K_PULL = 0.34;
+
+function hostStart(training){
+  mode = training ? 'train' : 'host'; show('host'); keepAwake(); Snd.unlock();
+  $('hExit').hidden = !training; $('hSwap').hidden = !!training;
+  resizeStage(); requestAnimationFrame(hostFrame);
+  if (training){
+    $('qrCard').hidden = true; $('netState').textContent = 'Тренировка';
+    $('trainMic').hidden = false; buildSkins('skinsTrain'); mountMicBox('micBoxTrain'); micInitStatus();
+    return;
+  }
+  let code = cleanCode(sessionStorage.getItem('gav_host_code')) || genCode();
+  openHostPeer(code);
+}
+function openHostPeer(code){
+  if (typeof Peer === 'undefined'){ $('netState').textContent = 'Нет интернета: не загрузилась связь'; return; }
+  net.code = code; $('netState').textContent = 'Подключение к сети…';
+  const peer = new Peer(ID_PREFIX + code.toLowerCase(), {debug:1});
+  net.peer = peer;
+  peer.on('open', () => {
+    try{ sessionStorage.setItem('gav_host_code', code); }catch(e){}
+    $('netState').textContent = '● Онлайн'; showQR(code);
+  });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id'){ peer.destroy(); try{ sessionStorage.removeItem('gav_host_code'); }catch(_){} openHostPeer(genCode()); }
+    else if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type==='socket-closed'){ $('netState').textContent = 'Нет связи с сервером, пробую снова…'; }
+    else $('netState').textContent = 'Ошибка связи: ' + e.type;
+  });
+  peer.on('disconnected', () => { $('netState').textContent = 'Переподключение…'; setTimeout(()=>{ try{ if (!peer.destroyed) peer.reconnect(); }catch(e){} }, 1500); });
+  peer.on('connection', conn => {
+    conn.on('data', d => hostMsg(conn, d));
+    conn.on('close', () => hostClose(conn));
+    conn.on('error', () => hostClose(conn));
+  });
+}
+function showQR(code){
+  const url = location.origin + location.pathname + '?room=' + code;
+  $('qrCard').hidden = false; $('qrCode').textContent = code; $('qrUrl').textContent = url.replace(/^https?:\/\//,'');
+  $('qr').innerHTML = '';
+  if (typeof QRCode !== 'undefined') new QRCode($('qr'), {text:url, width:256, height:256, colorDark:'#14161f', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M});
+}
+function hostMsg(conn, d){
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'hello'){
+    const id = String(d.id||'').replace(/[^a-z0-9]/gi,'').slice(0,24) || conn.peer;
+    let p = players.get(id);
+    if (p && p.conn && p.conn !== conn){ try{ p.conn.close(); }catch(e){} }
+    if (!p){ p = {id, joinedAt:Date.now(), barks:0, p:0, l:0, rdy:false, above:false, lastOn:0, open:0}; players.set(id, p); }
+    p.conn = conn; conn._pid = id; p.connected = true; p.goneAt = 0;
+    p.nick = cleanNick(d.nick) || 'Игрок'; p.skin = skinIdx(d.skin); p.mic = String(d.mic||'idle').slice(0,12);
+    assignSlots(); return;
+  }
+  const p = players.get(conn._pid); if (!p) return;
+  if (d.t === 'v'){ p.p = clamp(+d.p||0, 0, 1); p.l = clamp(+d.l||0, 0, 1); p.lastV = now(); }
+  else if (d.t === 'mic'){ p.mic = String(d.m||'').slice(0,12); }
+  else if (d.t === 'rdy'){ p.rdy = !!d.r; }
+  else if (d.t === 'prof'){ p.nick = cleanNick(d.nick) || p.nick; p.skin = skinIdx(d.skin); }
+}
+function hostClose(conn){
+  const p = players.get(conn._pid); if (!p || p.conn !== conn) return;
+  p.connected = false; p.conn = null; p.goneAt = now(); p.p = 0; p.l = 0; p.rdy = false;
+}
+function assignSlots(){
+  for (const s of ['L','R']) if (G[s] && !players.has(G[s])) G[s] = null;
+  const waiting = [...players.values()].filter(p => p.connected && p.id!==G.L && p.id!==G.R && !p.bot && !p.local).sort((a,b)=>a.joinedAt-b.joinedAt);
+  let changed = false;
+  if (!G.L && waiting.length){ G.L = waiting.shift().id; changed = true; }
+  if (!G.R && waiting.length){ G.R = waiting.shift().id; changed = true; }
+  if (changed && G.ph !== 'lobby') toLobby();
+}
+function toLobby(){ G.ph='lobby'; G.pos=0; G.win=null; for (const p of players.values()){ p.rdy=false; } }
+function slotP(s){ return G[s] ? players.get(G[s]) : null; }
+function micOk(p){ return p && (p.local || p.bot || p.mic === 'ok'); }
+function canStart(){ const a=slotP('L'), b=slotP('R'); return !!(a && b && (a.connected||a.local) && (b.connected||b.bot)); }
+function startCount(){
+  if (!canStart()) return;
+  G.ph = 'count'; G.cntAt = now(); G.pos = 0; G.win = null; pops.length = 0; confetti.length = 0;
+  for (const s of ['L','R']){ const p = slotP(s); p.barks = 0; p.rdy = false; p.above = false; p.lastOn = 0; }
+  if (mode==='train') micCalibStart();
+}
+function hostTick(dt){
+  const t = now();
+  // локальные игроки (тренировка)
+  for (const p of players.values()){
+    if (p.local){ micRead(); p.p = Mic.power; p.l = Mic.level; p.mic = Mic.status==='on'?'ok':Mic.status; }
+    if (p.bot) botStep(p, dt);
+    p.open += ((G.ph==='play'||G.ph==='lobby'||G.ph==='over' ? Math.max(p.p, p.l*0.35) : p.l*0.35) - p.open) * Math.min(1, dt*25);
+  }
+  // убираем пропавших
+  for (const p of [...players.values()]) if (!p.connected && !p.local && !p.bot && t - p.goneAt > 20000){ players.delete(p.id); assignSlots(); }
+  const L = slotP('L'), R = slotP('R');
+  if (G.ph === 'lobby' || G.ph === 'over'){
+    if (L && R && L.rdy && R.rdy && micOk(L) && micOk(R) && L.connected && R.connected) startCount();
+  } else if (G.ph === 'count'){
+    const e = (t - G.cntAt)/1000;
+    if (mode==='train' && e > 2 && Mic.calib) micCalibEnd();
+    const n = 3 - Math.floor(e);
+    if (n !== G._lastN){ G._lastN = n; if (n>=1 && n<=3) Snd.beep(520,0.12); }
+    if (e >= 3.2){ G.ph = 'play'; G.endAt = t + G.dur*1000; Snd.beep(880,0.25); Snd.beep(1320,0.2,0.12); }
+  } else if (G.ph === 'play'){
+    if (!L || !R){ toLobby(); return; }
+    G.pos = clamp(G.pos + (R.p - L.p) * K_PULL * dt, -1, 1);
+    for (const [s,p] of [['L',L],['R',R]]){
+      if (p.p > 0.22 && !p.above && t - p.lastOn > 140){ p.above = true; p.lastOn = t; p.barks++; pops.push({s, t0:t, r:Math.random()}); Snd.gav(s); }
+      else if (p.p < 0.1) p.above = false;
+    }
+    if (G.pos <= -1) finish('L'); else if (G.pos >= 1) finish('R');
+    else if (t >= G.endAt) finish(Math.abs(G.pos) < 0.02 ? 'draw' : (G.pos < 0 ? 'L' : 'R'));
+  }
+}
+function finish(w){
+  G.ph = 'over'; G.win = w; G.overAt = now();
+  for (const p of players.values()) p.rdy = false;
+  if (w !== 'draw') Snd.win(); else Snd.beep(440,0.4);
+  if (w !== 'draw') for (let i=0;i<120;i++) confetti.push({x:Math.random(), y:-Math.random()*0.5, vx:(Math.random()-.5)*0.08, vy:0.15+Math.random()*0.25, r:Math.random()*6, c:['#f2b33d','#ff9f43','#4cc9f0','#5bd28a','#f5efe6'][i%5], rot:Math.random()*6});
+}
+// бот: лает очередями
+function botStep(p, dt){
+  p._t = (p._t||0) - dt;
+  if (p._t <= 0){ p._bark = !p._bark; p._t = p._bark ? 0.15+Math.random()*0.35 : 0.08+Math.random()*0.5; p._amp = 0.45+Math.random()*0.45; }
+  const target = (G.ph==='play' && p._bark) ? p._amp : 0;
+  p.p += (target - p.p) * Math.min(1, dt*30); p.l = Math.max(0.1, p.p);
+}
+function pub(p){ return p ? {n:p.nick, s:p.skin, b:p.barks, m:p.mic, r:p.rdy, c:!!(p.connected||p.local||p.bot)} : null; }
+let lastBroadcast = 0;
+function broadcast(){
+  const t = now(); if (t - lastBroadcast < 50) return; lastBroadcast = t;
+  const q = [...players.values()].filter(p=>p.connected && p.id!==G.L && p.id!==G.R).sort((a,b)=>a.joinedAt-b.joinedAt);
+  const base = {t:'st', ph:G.ph, pos:+G.pos.toFixed(3), dur:G.dur, cnt: G.ph==='count' ? Math.max(0, 3 - (t-G.cntAt)/1000) : 0,
+    rem: G.ph==='play' ? Math.max(0, (G.endAt - t)/1000) : (G.ph==='lobby' ? G.dur : 0), win:G.win, L:pub(slotP('L')), R:pub(slotP('R'))};
+  for (const p of players.values()){
+    if (!p.conn || !p.conn.open) continue;
+    const you = p.id===G.L ? 'L' : p.id===G.R ? 'R' : 'Q';
+    try{ p.conn.send(Object.assign({}, base, {you, qpos: you==='Q' ? q.indexOf(p)+1 : 0})); }catch(e){}
+  }
+}
+// кнопки ведущего
+document.querySelectorAll('#hostBar .seg button').forEach(b => b.onclick = () => {
+  if (G.ph==='play' || G.ph==='count') return;
+  G.dur = +b.dataset.dur; document.querySelectorAll('#hostBar .seg button').forEach(x => x.setAttribute('aria-pressed', x===b ? 'true':'false'));
+});
+$('hStart').onclick = () => { if (G.ph==='play' || G.ph==='count'){ toLobby(); return; } startCount(); };
+$('hSwap').onclick = () => {
+  for (const s of ['L','R']){ const p = slotP(s); if (p){ try{ p.conn && p.conn.send({t:'bye'}); }catch(e){} const c = p.conn; setTimeout(()=>{ try{ c && c.close(); }catch(e){} }, 400); players.delete(p.id); } G[s] = null; }
+  toLobby(); assignSlots();
+};
+$('hSound').onclick = () => { sound = !sound; $('hSound').textContent = sound ? '🔊' : '🔇'; };
+$('hFull').onclick = () => { try{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }catch(e){} };
+$('hExit').onclick = () => location.href = location.pathname;
+let barTimer = 0;
+function pokeBar(){ $('hostBar').classList.remove('hide'); clearTimeout(barTimer); barTimer = setTimeout(()=>{ if (G.ph==='play'||G.ph==='count') $('hostBar').classList.add('hide'); }, 3000); }
+window.addEventListener('mousemove', () => { if (mode==='host'||mode==='train') pokeBar(); });
+$('trainGo').onclick = () => {
+  $('trainMic').hidden = true;
+  players.clear();
+  players.set('me', {id:'me', local:true, nick:'Ты', skin:mySkin, joinedAt:0, barks:0, p:0, l:0, open:0, rdy:false, connected:true, mic:'ok'});
+  players.set('bot', {id:'bot', bot:true, nick:'Бот Барбос', skin:(mySkin+3)%SKINS.length, joinedAt:1, barks:0, p:0, l:0, open:0, rdy:false, connected:true, mic:'ok'});
+  G.L = 'me'; G.R = 'bot'; toLobby();
+};
+
+/* ---------- звуки (мягкие) ---------- */
+const Snd = {
+  ctx:null,
+  unlock(){ try{ if (!this.ctx){ const AC = window.AudioContext||window.webkitAudioContext; this.ctx = new AC(); } this.ctx.resume(); }catch(e){} },
+  tone(f, dur, delay=0, type='sine', vol=0.18, f2){
+    if (!sound || !this.ctx) return; const c = this.ctx, t0 = c.currentTime + delay;
+    const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t0);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0+dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0+0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g).connect(c.destination); o.start(t0); o.stop(t0+dur+0.05);
+  },
+  beep(f, d, delay){ this.tone(f, d, delay||0, 'sine', 0.2); },
+  _g:{L:0,R:0},
+  gav(s){ const t = now(); if (t - this._g[s] < 120) return; this._g[s] = t; this.tone(s==='L'?330:300, 0.09, 0, 'triangle', 0.1, s==='L'?200:180); },
+  win(){ [523,659,784,1047].forEach((f,i)=>this.tone(f, 0.28, i*0.12, 'triangle', 0.16)); }
+};
+
+/* ---------- отрисовка сцены ---------- */
+const stage = $('stage'); let SC = null, bg = null;
+function resizeStage(){ SC = fitCanvas(stage); bg = null; }
+window.addEventListener('resize', () => { if (mode==='host'||mode==='train') resizeStage(); });
+function seeded(n){ let s = n; return () => (s = (s*16807) % 2147483647) / 2147483647; }
+function buildBg(w, h){
+  const cv = document.createElement('canvas'), dpr = Math.min(window.devicePixelRatio||1, 2);
+  cv.width = w*dpr; cv.height = h*dpr; const c = cv.getContext('2d'); c.scale(dpr, dpr);
+  const gy = h*0.74, u = Math.min(w/1600, h/900);
+  const sky = c.createLinearGradient(0,0,0,gy);
+  sky.addColorStop(0,'#141a3a'); sky.addColorStop(0.55,'#3a3466'); sky.addColorStop(0.85,'#c46a5a'); sky.addColorStop(1,'#eaa064');
+  c.fillStyle = sky; c.fillRect(0,0,w,gy);
+  const rnd = seeded(7);
+  c.fillStyle = 'rgba(255,255,255,.7)'; for (let i=0;i<70;i++){ c.globalAlpha = 0.2+rnd()*0.6; c.fillRect(rnd()*w, rnd()*gy*0.5, 1.5, 1.5); } c.globalAlpha = 1;
+  // дальние дома
+  for (let layer=0; layer<2; layer++){
+    c.fillStyle = layer ? '#211d3c' : '#2c2850';
+    let x = -20;
+    while (x < w){ const bw = (40+rnd()*90)*u*1.4, bh = (80+rnd()*(layer?160:260))*u*1.3;
+      c.fillRect(x, gy-bh, bw, bh);
+      if (layer){ c.fillStyle='rgba(255,210,120,.55)'; for (let wy=gy-bh+10*u; wy<gy-14*u; wy+=18*u) for (let wx=x+8*u; wx<x+bw-8*u; wx+=16*u) if (rnd()>0.6) c.fillRect(wx, wy, 6*u, 8*u); c.fillStyle='#211d3c'; }
+      x += bw + rnd()*12*u; }
+  }
+  // Байтерек
+  const cx = w*0.5, top = gy - 330*u, sr = 30*u;
+  c.strokeStyle = '#f2f0ea'; c.lineWidth = 3*u; c.globalAlpha = .9;
+  for (let i=-3;i<=3;i++){ c.beginPath(); c.moveTo(cx + i*5*u, gy); c.quadraticCurveTo(cx + i*3*u, gy-200*u, cx + i*14*u, top+sr*1.2); c.stroke(); }
+  for (let i=0;i<9;i++){ const a = Math.PI*(0.15 + i*0.0875); c.beginPath(); c.moveTo(cx + Math.cos(a)*sr*0.3, top+sr*1.2); c.quadraticCurveTo(cx+Math.cos(a)*sr*1.3, top+sr*1.1, cx+Math.cos(a)*sr*1.25, top+sr*0.3 - Math.abs(Math.cos(a))*sr*0.2); c.stroke(); }
+  c.globalAlpha = 1;
+  const glow = c.createRadialGradient(cx, top, 0, cx, top, sr*3); glow.addColorStop(0,'rgba(255,200,90,.55)'); glow.addColorStop(1,'rgba(255,200,90,0)');
+  c.fillStyle = glow; c.fillRect(cx-sr*3, top-sr*3, sr*6, sr*6);
+  const gold = c.createRadialGradient(cx-sr*0.3, top-sr*0.3, sr*0.1, cx, top, sr); gold.addColorStop(0,'#ffe9a8'); gold.addColorStop(1,'#d48a1c');
+  c.fillStyle = gold; c.beginPath(); c.arc(cx, top, sr, 0, Math.PI*2); c.fill();
+  // земля
+  const gr = c.createLinearGradient(0,gy,0,h); gr.addColorStop(0,'#2f3a2c'); gr.addColorStop(1,'#1a2019');
+  c.fillStyle = gr; c.fillRect(0, gy, w, h-gy);
+  c.fillStyle = 'rgba(255,255,255,.06)'; c.fillRect(0, gy, w, 3*u);
+  return cv;
+}
+function tag(c, x, y, u, p, side, empty){
+  const col = side==='L' ? '#ff9f43' : '#4cc9f0';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (empty){
+    c.fillStyle = 'rgba(245,239,230,.7)'; c.font = `600 ${30*u}px Rubik, sans-serif`; c.fillText('Ждём игрока…', x, y);
+    c.font = `400 ${22*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.5)'; c.fillText('сканируй QR-код', x, y+34*u); return;
+  }
+  c.font = `800 ${40*u}px Rubik, sans-serif`;
+  const tw = c.measureText(p.nick).width + 56*u;
+  c.fillStyle = col; c.beginPath(); c.roundRect ? c.roundRect(x-tw/2, y-30*u, tw, 60*u, 30*u) : c.rect(x-tw/2,y-30*u,tw,60*u); c.fill();
+  c.fillStyle = '#14161f'; c.fillText(p.nick, x, y+2*u);
+  // статус микрофона
+  const ok = micOk(p) && (p.connected||p.local||p.bot);
+  c.font = `600 ${24*u}px Rubik, sans-serif`;
+  let st = !(p.connected||p.local||p.bot) ? '⚠ нет связи' : ok ? '🎤 микрофон ок' : '🎤 нет доступа';
+  c.fillStyle = ok ? '#5bd28a' : '#ff5d6c'; c.fillText(st, x, y+50*u);
+  if (G.ph==='lobby' && p.rdy){ c.fillStyle='#5bd28a'; c.font = `800 ${26*u}px Rubik, sans-serif`; c.fillText('✔ ГОТОВ', x, y+84*u); }
+  if (G.ph!=='lobby'){ c.fillStyle='#f5efe6'; c.font = `800 ${30*u}px Rubik, sans-serif`; c.fillText('ГАВ × ' + p.barks, x, y+86*u); }
+}
+let lastT = now();
+function hostFrame(){
+  if (!(mode==='host'||mode==='train')) return;
+  requestAnimationFrame(hostFrame);
+  const t = now(), dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
+  hostTick(dt); if (mode==='host') broadcast();
+  if (!SC) resizeStage();
+  const {c, w, h} = SC, u = Math.min(w/1600, h/900), gy = h*0.74, ts = t/1000;
+  if (!bg) bg = buildBg(w, h);
+  c.drawImage(bg, 0, 0, w, h);
+  $('qrCard').classList.toggle('small', G.ph !== 'lobby');
+  $('hStart').textContent = (G.ph==='play'||G.ph==='count') ? 'Стоп' : G.ph==='over' ? 'Реванш' : 'Старт';
+  $('hStart').disabled = !(G.ph==='play'||G.ph==='count') && !canStart();
+  const L = slotP('L'), R = slotP('R');
+  // дорожка с косточкой
+  const tx0 = w*0.33, tx1 = w*0.67, ty = gy + 40*u, mid = (tx0+tx1)/2, half = (tx1-tx0)/2;
+  const bx = mid + G.pos*half;
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.roundRect ? c.roundRect(tx0-6*u, ty-18*u, tx1-tx0+12*u, 36*u, 18*u) : c.rect(tx0,ty-18*u,tx1-tx0,36*u); c.fill();
+  c.fillStyle = '#ff9f43'; c.fillRect(tx0, ty-12*u, Math.max(0, bx-tx0), 24*u);
+  c.fillStyle = '#4cc9f0'; c.fillRect(bx, ty-12*u, Math.max(0, tx1-bx), 24*u);
+  c.fillStyle = 'rgba(245,239,230,.8)'; c.fillRect(mid-1.5*u, ty-22*u, 3*u, 44*u);
+  // косточка
+  c.save(); c.translate(bx, ty - 2*u + Math.sin(ts*8)*2*u); c.rotate(Math.sin(ts*3)*0.08);
+  c.fillStyle = '#fbf3e4'; c.strokeStyle='#14161f'; c.lineWidth = 3*u;
+  const bw = 46*u, br = 13*u;
+  c.beginPath(); c.rect(-bw, -8*u, bw*2, 16*u); c.fill(); c.stroke();
+  for (const sx of [-1,1]) for (const sy of [-1,1]){ c.beginPath(); c.arc(sx*bw, sy*8*u, br, 0, Math.PI*2); c.fill(); c.stroke(); }
+  c.beginPath(); c.rect(-bw, -7*u, bw*2, 14*u); c.fill();
+  c.restore();
+  // собаки
+  const ds = 1.75*u, lx = w*0.17, rx = w*0.83;
+  for (const [side, p, x, flip] of [['L',L,lx,false],['R',R,rx,true]]){
+    const sk = p ? SKINS[p.skin] : GHOST, op = p ? clamp(p.open,0,1) : 0;
+    const lean = side==='L' ? -G.pos : G.pos; // косточка ближе — собака радостнее
+    drawDog(c, x, gy + 20*u, ds*(1 + Math.max(0,lean)*0.06), sk, op, ts + (side==='L'?0:1.3), flip);
+    // звуковые волны
+    if (p && op > 0.15){
+      const m = mouthPos(x, gy+20*u, ds, flip, op), dir = flip ? -1 : 1;
+      c.strokeStyle = side==='L' ? 'rgba(255,159,67,.8)' : 'rgba(76,201,240,.8)'; c.lineWidth = 6*u; c.lineCap='round';
+      const n = 1 + Math.floor(op*4);
+      for (let i=0;i<n;i++){ const ph = ((ts*2.2 + i/n) % 1), r = (20 + ph*120*op)*u;
+        c.globalAlpha = (1-ph)*0.9; c.beginPath(); c.arc(m.x, m.y, r, dir>0 ? -0.6 : Math.PI-0.6, dir>0 ? 0.6 : Math.PI+0.6); c.stroke(); }
+      c.globalAlpha = 1;
+    }
+    tag(c, x, gy + 84*u, u, p, side, !p);
+  }
+  // всплывающие ГАВ!
+  for (let i=pops.length-1;i>=0;i--){
+    const pp = pops[i], a = (t-pp.t0)/700; if (a>1){ pops.splice(i,1); continue; }
+    const p = slotP(pp.s); if (!p) continue;
+    const flip = pp.s==='R', m = mouthPos(flip?rx:lx, gy+20*u, ds, flip, 0.8);
+    c.save(); c.globalAlpha = 1 - a; c.translate(m.x + (flip?-1:1)*(40+pp.r*60)*u, m.y - (40 + a*120)*u);
+    c.rotate((pp.r-0.5)*0.4); c.font = `${(44 + pp.r*24)*u*(1+a*0.3)}px "Rubik Mono One", sans-serif`; c.textAlign='center';
+    c.lineWidth = 8*u; c.strokeStyle = '#14161f'; c.strokeText('ГАВ!', 0, 0); c.fillStyle = pp.s==='L' ? '#ff9f43' : '#4cc9f0'; c.fillText('ГАВ!', 0, 0);
+    c.restore();
+  }
+  // верх: заголовок / таймер
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (G.ph === 'lobby'){
+    c.font = `${64*u}px "Rubik Mono One", sans-serif`; c.fillStyle = '#f5efe6'; c.fillText('КТО КОГО', w/2, 90*u);
+    c.fillStyle = '#f2b33d'; c.fillText('ПЕРЕГАВКАЕТ', w/2, 165*u);
+    c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
+    const msg = !L || !R ? 'Сканируйте QR-код и выберите собаку' : (!micOk(L)||!micOk(R)) ? 'Ждём, пока оба включат микрофон' : (!L.rdy||!R.rdy) ? 'Нажмите «Я готов» на телефонах' : '';
+    c.fillText(msg, w/2, 225*u);
+    const qn = [...players.values()].filter(p=>p.connected && p.id!==G.L && p.id!==G.R).length;
+    if (qn){ c.font = `400 ${22*u}px Rubik, sans-serif`; c.fillText('В очереди: ' + qn, w/2, 262*u); }
+  } else if (G.ph === 'count'){
+    const e = (t-G.cntAt)/1000, n = 3 - Math.floor(e);
+    c.fillStyle = 'rgba(20,22,31,.35)'; c.fillRect(0,0,w,h);
+    c.font = `${260*u*(1.15 - (e%1)*0.2)}px "Rubik Mono One", sans-serif`; c.fillStyle = '#f2b33d';
+    c.fillText(n >= 1 ? String(n) : 'ГАВ!', w/2, h*0.42);
+    c.font = `600 ${34*u}px Rubik, sans-serif`; c.fillStyle = '#f5efe6';
+    c.fillText(e < 2 ? 'Тишина! Слушаем шум зала…' : 'Приготовились лаять!', w/2, h*0.42 + 170*u);
+  } else if (G.ph === 'play'){
+    const rem = Math.max(0, (G.endAt - t)/1000);
+    c.font = `${96*u}px "Rubik Mono One", sans-serif`; c.fillStyle = rem < 5.5 ? '#ff5d6c' : '#f5efe6';
+    c.fillText(Math.ceil(rem).toString(), w/2, 100*u);
+    c.font = `600 ${26*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.75)'; c.fillText('ЛАЙТЕ В ТЕЛЕФОН!', w/2, 175*u);
+  } else if (G.ph === 'over'){
+    const wp = G.win==='draw' ? null : slotP(G.win), a = Math.min(1, (t-G.overAt)/400);
+    c.fillStyle = `rgba(20,22,31,${0.45*a})`; c.fillRect(0,0,w,h*0.6);
+    c.font = `${70*u*(0.6+0.4*a)}px "Rubik Mono One", sans-serif`;
+    c.fillStyle = G.win==='L' ? '#ff9f43' : G.win==='R' ? '#4cc9f0' : '#f5efe6';
+    c.fillText(wp ? 'ПОБЕДА!' : 'НИЧЬЯ!', w/2, 110*u);
+    if (wp){ c.font = `800 ${56*u}px Rubik, sans-serif`; c.fillStyle = '#f5efe6'; c.fillText(wp.nick + ' перегавкал(а)!', w/2, 195*u); }
+    c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.8)';
+    c.fillText('Реванш: «Ещё раунд» на телефонах или кнопка «Реванш»', w/2, 255*u);
+  }
+  // конфетти
+  for (let i=confetti.length-1;i>=0;i--){ const f = confetti[i]; f.x += f.vx*dt; f.y += f.vy*dt; f.rot += dt*5; if (f.y>1.1){ confetti.splice(i,1); continue; }
+    c.save(); c.translate(f.x*w, f.y*h); c.rotate(f.rot); c.fillStyle = f.c; c.fillRect(-5*u,-8*u,10*u,16*u); c.restore(); }
+  if (mode==='train' && G.ph==='over' && t - G.overAt > 3500){ /* можно перезапустить кнопкой */ }
+  if (mode==='train' && G.ph==='lobby' && players.has('me')){ players.get('me').rdy = true; players.get('bot').rdy = true; }
+}
+
+/* ================== ТЕЛЕФОН ИГРОКА ================== */
+let pSt = null, pCalibRound = -1, pRound = 0;
+function joinScreen(code){
+  mode = 'join'; show('join');
+  $('codeIn').value = cleanCode(code || ''); $('nickIn').value = store.get('nick', '');
+  buildSkins('skinsJoin'); mountMicBox('micBoxJoin'); micInitStatus();
+  if (envInfo().inapp) $('joinErr').textContent = 'Открой страницу в Safari или Chrome, иначе микрофон может не работать.';
+}
+$('joinBtn').onclick = () => {
+  const code = cleanCode($('codeIn').value);
+  if (code.length !== 4){ $('joinErr').textContent = 'Введи код из 4 символов с экрана телевизора.'; return; }
+  if (!cleanNick($('nickIn').value)){ $('joinErr').textContent = 'Напиши своё имя, оно будет на экране.'; $('nickIn').focus(); return; }
+  store.set('nick', cleanNick($('nickIn').value)); $('joinErr').textContent = '';
+  try{ history.replaceState(null, '', location.pathname + '?room=' + code); }catch(e){}
+  playerStart(code);
+};
+function playerStart(code){
+  mode = 'player'; show('player'); keepAwake();
+  net.code = code; $('pCode').textContent = 'Комната ' + code;
+  micBoxes.length = 0; mountMicBox('micBoxPlay', {noMeter:true}); micChanged();
+  connectPlayer();
+  requestAnimationFrame(playerFrame);
+}
+function connectPlayer(){
+  if (typeof Peer === 'undefined'){ setNet('Нет интернета', false); return; }
+  setNet('Подключаюсь…', false); $('pRole').textContent = 'Подключаюсь…';
+  if (!net.peer || net.peer.destroyed){
+    net.peer = new Peer({debug:1});
+    net.peer.on('open', openConn);
+    net.peer.on('error', e => {
+      if (e.type === 'peer-unavailable'){ $('pRole').textContent = 'Комната не найдена'; $('pNote').textContent = 'Проверь код на экране телевизора. Пробую ещё раз…'; scheduleRetry(); }
+      else { setNet('Нет связи', false); scheduleRetry(); }
+    });
+    net.peer.on('disconnected', () => { try{ net.peer.reconnect(); }catch(e){} });
+  } else if (net.peer.open) openConn();
+  else scheduleRetry();
+}
+function openConn(){
+  const conn = net.peer.connect(ID_PREFIX + net.code.toLowerCase(), {serialization:'json', reliable:true});
+  const timer = setTimeout(()=>{ if (!conn.open){ try{ conn.close(); }catch(e){} scheduleRetry(); } }, 10000);
+  conn.on('open', () => {
+    clearTimeout(timer); net.conn = conn; setNet('● на связи', true);
+    send({t:'hello', id:clientId, nick:store.get('nick','Игрок'), skin:mySkin, mic: Mic.status==='on' ? 'ok' : Mic.status});
+  });
+  conn.on('data', playerMsg);
+  conn.on('close', () => { if (net.conn === conn){ net.conn = null; if (!net.bye){ setNet('Связь потеряна…', false); scheduleRetry(); } } });
+  conn.on('error', () => {});
+}
+function scheduleRetry(){ clearTimeout(net.retry); if (net.bye) return; net.retry = setTimeout(connectPlayer, 2500); }
+function setNet(t, ok){ $('pNet').textContent = t; $('pNet').style.color = ok ? 'var(--ok)' : 'var(--bad)'; }
+let lastSendV = 0;
+setInterval(() => { if (mode==='player' && net.conn){ send({t:'v', p:+Mic.power.toFixed(3), l:+Mic.level.toFixed(3)}); } }, 50);
+function playerMsg(d){
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'bye'){
+    net.bye = true; try{ net.conn && net.conn.close(); }catch(e){}
+    $('pRole').textContent = 'Спасибо за игру!'; $('pState').textContent = ''; $('pNote').textContent = 'Ведущий позвал следующих игроков.';
+    $('pGame').hidden = true; $('rdyBtn').textContent = 'Встать в очередь снова'; $('rdyBtn').disabled = false; $('rdyBtn').classList.remove('on');
+    $('rdyBtn').onclick = () => { net.bye = false; $('rdyBtn').onclick = rdyClick; connectPlayer(); };
+    pSt = null; return;
+  }
+  if (d.t !== 'st') return;
+  const prev = pSt; pSt = d;
+  // калибровка шума во время отсчёта
+  if (d.ph === 'count' && (!prev || prev.ph !== 'count')){ pRound++; micCalibStart(); }
+  if (d.ph === 'count' && d.cnt < 1.1 && Mic.calib) micCalibEnd();
+  if (d.ph !== 'count' && Mic.calib) micCalibEnd();
+  if (d.ph === 'over' && prev && prev.ph === 'play' && navigator.vibrate){ try{ navigator.vibrate(d.win===d.you ? [80,60,80,60,200] : 200); }catch(e){} }
+  renderPlayer();
+}
+function renderPlayer(){
+  const d = pSt; if (!d) return;
+  const me = d.you==='L' ? d.L : d.you==='R' ? d.R : null, them = d.you==='L' ? d.R : d.you==='R' ? d.L : null;
+  const sideName = d.you==='L' ? 'Ты слева 🟠' : d.you==='R' ? 'Ты справа 🔵' : 'Ты в очереди №' + d.qpos;
+  $('pRole').textContent = sideName;
+  $('pGame').hidden = !(d.you!=='Q' && (d.ph==='play' || d.ph==='over' || d.ph==='count'));
+  let state = '', note = '';
+  if (d.you === 'Q'){ state = 'Скоро твоя очередь'; note = 'Смотри на экран и готовь голос.'; }
+  else if (d.ph === 'lobby'){
+    if (Mic.status !== 'on'){ state = 'Включи микрофон'; note = 'Без него собака не сможет лаять.'; }
+    else if (!them){ state = me && me.r ? 'Ждём соперника' : 'Нажми «Я готов»'; note = 'Соперник ещё не подключился.'; }
+    else if (me && me.r){ state = them.r ? 'Начинаем!' : 'Ждём ' + them.n; note = 'Держи телефон у лица.'; }
+    else { state = 'Нажми «Я готов»'; note = 'Соперник: ' + them.n; }
+  } else if (d.ph === 'count'){
+    state = d.cnt > 1.1 ? 'ТИШИНА… ' + Math.ceil(d.cnt) : 'ПРИГОТОВЬСЯ!'; note = 'Не шуми, измеряем шум зала.';
+  } else if (d.ph === 'play'){ state = 'ЛАЙ!!!'; note = 'Чем громче и дольше, тем сильнее тянешь.'; }
+  else if (d.ph === 'over'){
+    state = d.win === 'draw' ? 'НИЧЬЯ' : d.win === d.you ? 'ПОБЕДА! 🏆' : 'Поражение';
+    note = 'Твои гавки: ' + (me ? me.b : 0) + (them ? ' · соперник: ' + them.b : '');
+  }
+  $('pState').textContent = state; $('pNote').textContent = note;
+  if (!$('pGame').hidden){
+    const myPull = d.you==='L' ? -d.pos : d.pos; // >0 — косточка у меня
+    const leftPct = (1 + (d.you==='L' ? -d.pos : d.pos)) / 2 * 100; // слева всегда «я»
+    $('pTugL').style.width = leftPct.toFixed(1)+'%'; $('pBone').style.left = leftPct.toFixed(1)+'%';
+    $('pTugL').style.background = d.you==='L' ? 'var(--left)' : 'var(--right)';
+    $('pTugL').parentElement.style.background = d.you==='L' ? 'var(--right)' : 'var(--left)';
+    $('pMe').textContent = 'Я: ' + (me?me.b:0); $('pThem').textContent = (them?them.n:'') + ': ' + (them?them.b:0);
+    $('pTime').textContent = d.ph==='play' ? Math.ceil(d.rem) + ' с' : '';
+  }
+  updateReadyBtn();
+}
+function updateReadyBtn(){
+  const b = $('rdyBtn'), d = pSt; if (net.bye) return;
+  if (!d || d.you === 'Q' || d.ph === 'count' || d.ph === 'play'){ b.hidden = true; return; }
+  b.hidden = false; b.onclick = rdyClick;
+  const me = d.you==='L' ? d.L : d.R, r = !!(me && me.r);
+  b.disabled = Mic.status !== 'on';
+  b.classList.toggle('on', r);
+  b.textContent = Mic.status !== 'on' ? 'Сначала включи микрофон' : r ? '✔ Готов (нажми, чтобы отменить)' : d.ph === 'over' ? 'Ещё раунд' : 'Я готов';
+}
+function rdyClick(){ const d = pSt; if (!d) return; const me = d.you==='L' ? d.L : d.R; send({t:'rdy', r: !(me && me.r)}); keepAwake(); if (Mic.ctx) Mic.ctx.resume(); }
+function playerFrame(){
+  if (mode !== 'player') return; requestAnimationFrame(playerFrame);
+  const cv = $('pDog'), {c, w, h} = fitCanvas(cv);
+  c.clearRect(0,0,w,h);
+  const open = clamp(Math.max(Mic.power, Mic.level*0.35), 0, 1);
+  drawDog(c, w*0.42, h*0.93, w/260, SKINS[mySkin], open, now()/1000, false);
+  if (open > 0.2){ const m = mouthPos(w*0.42, h*0.93, w/260, false, open); c.strokeStyle = 'rgba(242,179,61,.85)'; c.lineWidth = 4; c.lineCap='round';
+    for (let i=0;i<3;i++){ const ph = ((now()/450 + i/3) % 1); c.globalAlpha = 1-ph; c.beginPath(); c.arc(m.x, m.y, 10 + ph*60*open, -0.6, 0.6); c.stroke(); } c.globalAlpha = 1; }
+  $('pMeter').style.width = (Mic.level*100).toFixed(1)+'%'; $('pGate').style.left = (micGate()*100).toFixed(1)+'%';
+}
+
+/* ================== старт ================== */
+$('goHost').onclick = () => hostStart(false);
+$('goJoin').onclick = () => joinScreen('');
+$('goTrain').onclick = () => hostStart(true);
+(function boot(){
+  let room = '';
+  try{ room = cleanCode(new URLSearchParams(location.search).get('room')); }catch(e){}
+  if (room) joinScreen(room);
+})();
+</script>
+</body>
+</html>
