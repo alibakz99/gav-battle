@@ -338,11 +338,37 @@ function micRead(){
   let sum = 0; for (let i=0;i<Mic.buf.length;i++){ const v = Mic.buf[i]; sum += v*v; }
   const rms = Math.sqrt(sum/Mic.buf.length) + 1e-9;
   const lv = clamp((20*Math.log10(rms) + 60) / 50, 0, 1);
+  Mic.raw = lv;
   Mic.level = lv > Mic.level ? lv : Mic.level*0.8 + lv*0.2;
   if (Mic.calib) Mic.calib.push(lv);
   else if (lv < Mic.floor) Mic.floor = Mic.floor*0.9 + lv*0.1; else Mic.floor += (lv - Mic.floor)*0.0015;
   const gate = micGate();
   Mic.power = Mic.level > gate ? clamp((Mic.level - gate)/(1 - gate), 0, 1) : 0;
+  detectBark(now(), lv, gate);
+}
+/* Распознавание «ГАВ!»: резкий подъём громкости, короткий звук (до ~0,45 с) и спад.
+   Долгое «ААААА» или плавный рост не засчитываются. */
+const Det = {st:'idle', t0:0, peak:0, hist:[], n:0, onBark:null, onLong:null};
+const BARK_MIN = 50, BARK_MAX = 450;
+function detectBark(t, lv, gate){
+  const h = Det.hist; h.push([t, lv]); while (h.length && t - h[0][0] > 130) h.shift();
+  const loud = lv > gate + 0.06;
+  if (Det.st === 'idle'){
+    if (loud){
+      let mn = 1; for (const x of h) if (x[1] < mn) mn = x[1];
+      if (lv - mn > 0.13){ Det.st = 'burst'; Det.t0 = t; Det.peak = lv; }
+      else Det.st = 'hold';
+    }
+  } else if (Det.st === 'burst'){
+    if (lv > Det.peak) Det.peak = lv;
+    const dur = t - Det.t0;
+    if (lv < gate + 0.02 || lv < Det.peak - 0.22){
+      Det.st = 'idle';
+      if (dur >= BARK_MIN && dur <= BARK_MAX){ Det.n++; const str = clamp((Det.peak - gate)/(1 - gate), 0.1, 1); if (Det.onBark) Det.onBark(str, Det.n); }
+    } else if (dur > BARK_MAX){ Det.st = 'long'; Det.n++; if (Det.onLong) Det.onLong(Det.n); }
+  } else {
+    if (lv < gate + 0.02) Det.st = 'idle';
+  }
 }
 function micGate(){ return clamp(Mic.floor + 0.14, 0.14, 0.7); }
 function micCalibStart(){ Mic.calib = []; }
@@ -356,7 +382,7 @@ const MIC_TEXT = {
   idle:    ['Микрофон ещё не включён', ''],
   prompt:  ['Нужно разрешение на микрофон', 'Нажми кнопку, браузер спросит разрешение. Выбери «Разрешить».'],
   granted: ['Микрофон разрешён', 'Нажми кнопку, чтобы включить его.'],
-  on:      ['Микрофон работает', 'Скажи «ГАВ!» — полоска должна прыгнуть.'],
+  on:      ['Микрофон работает', 'Скажи коротко «ГАВ!» — полоска должна прыгнуть и упасть.'],
   denied:  ['Доступ к микрофону запрещён', ''],
   nomic:   ['Микрофон не найден', 'Проверь, что у устройства есть микрофон и он не отключён.'],
   busy:    ['Микрофон занят', 'Закрой звонок, диктофон или другое приложение, которое использует микрофон, и нажми «Проверить снова».'],
@@ -404,8 +430,8 @@ async function micInitStatus(){
   micChanged();
 }
 // анимация полосок громкости
+setInterval(()=>{ if (mode==='player' || mode==='join' || mode==='train') micRead(); }, 20);
 setInterval(()=>{
-  if (mode==='player' || mode==='join' || (mode==='train' && !players.has('me'))){ micRead(); }
   for (const b of micBoxes){ if (b.meter){ b.meter.style.width = (Mic.level*100).toFixed(1)+'%'; b.gate.style.left = (micGate()*100).toFixed(1)+'%'; } }
 }, 40);
 
@@ -421,7 +447,24 @@ const G = { ph:'lobby', pos:0, dur:30, cntAt:0, endAt:0, win:null, L:null, R:nul
 const players = new Map(); // id -> игрок
 const pops = [], confetti = [];
 let sound = true;
-const K_PULL = 0.34;
+const BARK_PULL = 0.03, BARK_PULL_LOUD = 0.05;
+let posShow = 0;
+function hostBark(id, str, n){
+  const p = players.get(id); if (!p) return;
+  if (n !== undefined){ if (n <= (p.lastN||0)) return; p.lastN = n; }
+  const side = id===G.L ? 'L' : id===G.R ? 'R' : null;
+  if (!side || G.ph !== 'play') return;
+  str = clamp(+str||0, 0, 1);
+  G.pos = clamp(G.pos + (side==='L' ? -1 : 1) * (BARK_PULL + BARK_PULL_LOUD*str), -1, 1);
+  p.barks++; p.kick = 1; pops.push({s:side, t0:now(), r:Math.random()}); Snd.gav(side);
+}
+function hostLong(id, n){
+  const p = players.get(id); if (!p) return;
+  if (n !== undefined){ if (n <= (p.lastN||0)) return; p.lastN = n; }
+  const side = id===G.L ? 'L' : id===G.R ? 'R' : null;
+  if (!side || G.ph !== 'play') return;
+  p.longs = (p.longs||0) + 1; pops.push({s:side, t0:now(), r:Math.random(), bad:true});
+}
 
 function hostStart(training){
   mode = training ? 'train' : 'host'; show('host'); keepAwake(); Snd.unlock();
@@ -477,6 +520,8 @@ function hostMsg(conn, d){
   if (d.t === 'v'){ p.p = clamp(+d.p||0, 0, 1); p.l = clamp(+d.l||0, 0, 1); p.lastV = now(); }
   else if (d.t === 'mic'){ p.mic = String(d.m||'').slice(0,12); }
   else if (d.t === 'rdy'){ p.rdy = !!d.r; }
+  else if (d.t === 'bark'){ hostBark(p.id, d.s, +d.n); }
+  else if (d.t === 'long'){ hostLong(p.id, +d.n); }
   else if (d.t === 'prof'){ p.nick = cleanNick(d.nick) || p.nick; p.skin = skinIdx(d.skin); }
 }
 function hostClose(conn){
@@ -498,14 +543,14 @@ function canStart(){ const a=slotP('L'), b=slotP('R'); return !!(a && b && (a.co
 function startCount(){
   if (!canStart()) return;
   G.ph = 'count'; G.cntAt = now(); G.pos = 0; G.win = null; pops.length = 0; confetti.length = 0;
-  for (const s of ['L','R']){ const p = slotP(s); p.barks = 0; p.rdy = false; p.above = false; p.lastOn = 0; }
+  for (const s of ['L','R']){ const p = slotP(s); p.barks = 0; p.longs = 0; p.rdy = false; }
   if (mode==='train') micCalibStart();
 }
 function hostTick(dt){
   const t = now();
   // локальные игроки (тренировка)
   for (const p of players.values()){
-    if (p.local){ micRead(); p.p = Mic.power; p.l = Mic.level; p.mic = Mic.status==='on'?'ok':Mic.status; }
+    if (p.local){ p.p = Mic.power; p.l = Mic.level; p.mic = Mic.status==='on'?'ok':Mic.status; }
     if (p.bot) botStep(p, dt);
     p.open += ((G.ph==='play'||G.ph==='lobby'||G.ph==='over' ? Math.max(p.p, p.l*0.35) : p.l*0.35) - p.open) * Math.min(1, dt*25);
   }
@@ -522,11 +567,6 @@ function hostTick(dt){
     if (e >= 3.2){ G.ph = 'play'; G.endAt = t + G.dur*1000; Snd.beep(880,0.25); Snd.beep(1320,0.2,0.12); }
   } else if (G.ph === 'play'){
     if (!L || !R){ toLobby(); return; }
-    G.pos = clamp(G.pos + (R.p - L.p) * K_PULL * dt, -1, 1);
-    for (const [s,p] of [['L',L],['R',R]]){
-      if (p.p > 0.22 && !p.above && t - p.lastOn > 140){ p.above = true; p.lastOn = t; p.barks++; pops.push({s, t0:t, r:Math.random()}); Snd.gav(s); }
-      else if (p.p < 0.1) p.above = false;
-    }
     if (G.pos <= -1) finish('L'); else if (G.pos >= 1) finish('R');
     else if (t >= G.endAt) finish(Math.abs(G.pos) < 0.02 ? 'draw' : (G.pos < 0 ? 'L' : 'R'));
   }
@@ -540,9 +580,12 @@ function finish(w){
 // бот: лает очередями
 function botStep(p, dt){
   p._t = (p._t||0) - dt;
-  if (p._t <= 0){ p._bark = !p._bark; p._t = p._bark ? 0.15+Math.random()*0.35 : 0.08+Math.random()*0.5; p._amp = 0.45+Math.random()*0.45; }
-  const target = (G.ph==='play' && p._bark) ? p._amp : 0;
-  p.p += (target - p.p) * Math.min(1, dt*30); p.l = Math.max(0.1, p.p);
+  if (p._t <= 0){
+    p._t = 0.28 + Math.random()*0.55;
+    if (G.ph === 'play'){ const s = 0.35 + Math.random()*0.5; p._amp = s; hostBark(p.id, s); }
+  }
+  p.p = Math.max(0, (p.p||0) - dt*6); if (p.kick) { p.p = Math.max(p.p, p._amp||0.6); p.kick = 0; }
+  p.l = Math.max(0.1, p.p);
 }
 function pub(p){ return p ? {n:p.nick, s:p.skin, b:p.barks, m:p.mic, r:p.rdy, c:!!(p.connected||p.local||p.bot)} : null; }
 let lastBroadcast = 0;
@@ -579,6 +622,8 @@ $('trainGo').onclick = () => {
   players.set('me', {id:'me', local:true, nick:'Ты', skin:mySkin, joinedAt:0, barks:0, p:0, l:0, open:0, rdy:false, connected:true, mic:'ok'});
   players.set('bot', {id:'bot', bot:true, nick:'Бот Барбос', skin:(mySkin+3)%SKINS.length, joinedAt:1, barks:0, p:0, l:0, open:0, rdy:false, connected:true, mic:'ok'});
   G.L = 'me'; G.R = 'bot'; toLobby();
+  Det.onBark = (s, n) => hostBark('me', s, n);
+  Det.onLong = (n) => hostLong('me', n);
 };
 
 /* ---------- звуки (мягкие) ---------- */
@@ -672,7 +717,8 @@ function hostFrame(){
   const L = slotP('L'), R = slotP('R');
   // дорожка с косточкой
   const tx0 = w*0.33, tx1 = w*0.67, ty = gy + 40*u, mid = (tx0+tx1)/2, half = (tx1-tx0)/2;
-  const bx = mid + G.pos*half;
+  posShow += (G.pos - posShow) * Math.min(1, dt*10);
+  const bx = mid + posShow*half;
   c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.roundRect ? c.roundRect(tx0-6*u, ty-18*u, tx1-tx0+12*u, 36*u, 18*u) : c.rect(tx0,ty-18*u,tx1-tx0,36*u); c.fill();
   c.fillStyle = '#ff9f43'; c.fillRect(tx0, ty-12*u, Math.max(0, bx-tx0), 24*u);
   c.fillStyle = '#4cc9f0'; c.fillRect(bx, ty-12*u, Math.max(0, tx1-bx), 24*u);
@@ -704,9 +750,15 @@ function hostFrame(){
   }
   // всплывающие ГАВ!
   for (let i=pops.length-1;i>=0;i--){
-    const pp = pops[i], a = (t-pp.t0)/700; if (a>1){ pops.splice(i,1); continue; }
+    const pp = pops[i], a = (t-pp.t0)/(pp.bad ? 1100 : 700); if (a>1){ pops.splice(i,1); continue; }
     const p = slotP(pp.s); if (!p) continue;
     const flip = pp.s==='R', m = mouthPos(flip?rx:lx, gy+20*u, ds, flip, 0.8);
+    if (pp.bad){
+      c.save(); c.globalAlpha = 1 - a; c.translate(m.x + (flip?-1:1)*60*u, m.y - (60 + a*60)*u);
+      c.font = `800 ${34*u}px Rubik, sans-serif`; c.textAlign='center';
+      c.lineWidth = 7*u; c.strokeStyle = '#14161f'; c.strokeText('Это не гав! Короче!', 0, 0); c.fillStyle = '#ff5d6c'; c.fillText('Это не гав! Короче!', 0, 0);
+      c.restore(); continue;
+    }
     c.save(); c.globalAlpha = 1 - a; c.translate(m.x + (flip?-1:1)*(40+pp.r*60)*u, m.y - (40 + a*120)*u);
     c.rotate((pp.r-0.5)*0.4); c.font = `${(44 + pp.r*24)*u*(1+a*0.3)}px "Rubik Mono One", sans-serif`; c.textAlign='center';
     c.lineWidth = 8*u; c.strokeStyle = '#14161f'; c.strokeText('ГАВ!', 0, 0); c.fillStyle = pp.s==='L' ? '#ff9f43' : '#4cc9f0'; c.fillText('ГАВ!', 0, 0);
@@ -717,6 +769,9 @@ function hostFrame(){
   if (G.ph === 'lobby'){
     c.font = `${64*u}px "Rubik Mono One", sans-serif`; c.fillStyle = '#f5efe6'; c.fillText('КТО КОГО', w/2, 90*u);
     c.fillStyle = '#f2b33d'; c.fillText('ПЕРЕГАВКАЕТ', w/2, 165*u);
+    c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
+    c.font = `400 ${24*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.65)';
+    c.fillText('Лайте отрывисто: «ГАВ! ГАВ!» Долгий крик не считается', w/2, 300*u);
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
     const msg = !L || !R ? 'Сканируйте QR-код и выберите собаку' : (!micOk(L)||!micOk(R)) ? 'Ждём, пока оба включат микрофон' : (!L.rdy||!R.rdy) ? 'Нажмите «Я готов» на телефонах' : '';
     c.fillText(msg, w/2, 225*u);
@@ -733,7 +788,7 @@ function hostFrame(){
     const rem = Math.max(0, (G.endAt - t)/1000);
     c.font = `${96*u}px "Rubik Mono One", sans-serif`; c.fillStyle = rem < 5.5 ? '#ff5d6c' : '#f5efe6';
     c.fillText(Math.ceil(rem).toString(), w/2, 100*u);
-    c.font = `600 ${26*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.75)'; c.fillText('ЛАЙТЕ В ТЕЛЕФОН!', w/2, 175*u);
+    c.font = `600 ${26*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.75)'; c.fillText('КОРОТКО И ГРОМКО: ГАВ! ГАВ!', w/2, 175*u);
   } else if (G.ph === 'over'){
     const wp = G.win==='draw' ? null : slotP(G.win), a = Math.min(1, (t-G.overAt)/400);
     c.fillStyle = `rgba(20,22,31,${0.45*a})`; c.fillRect(0,0,w,h*0.6);
@@ -767,7 +822,10 @@ $('joinBtn').onclick = () => {
   try{ history.replaceState(null, '', location.pathname + '?room=' + code); }catch(e){}
   playerStart(code);
 };
+let pFlash = null;
 function playerStart(code){
+  Det.onBark = (s, n) => { send({t:'bark', s:+s.toFixed(3), n}); if (pSt && pSt.ph==='play'){ pFlash = {ok:true, t:now()}; if (navigator.vibrate) try{ navigator.vibrate(25); }catch(e){} } };
+  Det.onLong = (n) => { send({t:'long', n}); if (pSt && pSt.ph==='play') pFlash = {ok:false, t:now()}; };
   mode = 'player'; show('player'); keepAwake();
   net.code = code; $('pCode').textContent = 'Комната ' + code;
   micBoxes.length = 0; mountMicBox('micBoxPlay', {noMeter:true}); micChanged();
@@ -832,11 +890,14 @@ function renderPlayer(){
   else if (d.ph === 'lobby'){
     if (Mic.status !== 'on'){ state = 'Включи микрофон'; note = 'Без него собака не сможет лаять.'; }
     else if (!them){ state = me && me.r ? 'Ждём соперника' : 'Нажми «Я готов»'; note = 'Соперник ещё не подключился.'; }
-    else if (me && me.r){ state = them.r ? 'Начинаем!' : 'Ждём ' + them.n; note = 'Держи телефон у лица.'; }
+    else if (me && me.r){ state = them.r ? 'Начинаем!' : 'Ждём ' + them.n; note = 'Держи телефон у лица. Лай коротко: ГАВ!'; }
     else { state = 'Нажми «Я готов»'; note = 'Соперник: ' + them.n; }
   } else if (d.ph === 'count'){
     state = d.cnt > 1.1 ? 'ТИШИНА… ' + Math.ceil(d.cnt) : 'ПРИГОТОВЬСЯ!'; note = 'Не шуми, измеряем шум зала.';
-  } else if (d.ph === 'play'){ state = 'ЛАЙ!!!'; note = 'Чем громче и дольше, тем сильнее тянешь.'; }
+  } else if (d.ph === 'play'){
+    state = 'ЛАЙ!!!'; note = 'Коротко и громко: ГАВ! ГАВ! Долгий крик не считается.';
+    if (pFlash && now() - pFlash.t < 700){ state = pFlash.ok ? 'ГАВ! ✔' : 'Это не гав!'; note = pFlash.ok ? 'Засчитано, ещё!' : 'Слишком долго. Лай коротко: ГАВ!'; }
+  }
   else if (d.ph === 'over'){
     state = d.win === 'draw' ? 'НИЧЬЯ' : d.win === d.you ? 'ПОБЕДА! 🏆' : 'Поражение';
     note = 'Твои гавки: ' + (me ? me.b : 0) + (them ? ' · соперник: ' + them.b : '');
@@ -872,6 +933,7 @@ function playerFrame(){
   if (open > 0.2){ const m = mouthPos(w*0.42, h*0.93, w/260, false, open); c.strokeStyle = 'rgba(242,179,61,.85)'; c.lineWidth = 4; c.lineCap='round';
     for (let i=0;i<3;i++){ const ph = ((now()/450 + i/3) % 1); c.globalAlpha = 1-ph; c.beginPath(); c.arc(m.x, m.y, 10 + ph*60*open, -0.6, 0.6); c.stroke(); } c.globalAlpha = 1; }
   $('pMeter').style.width = (Mic.level*100).toFixed(1)+'%'; $('pGate').style.left = (micGate()*100).toFixed(1)+'%';
+  if (pFlash && pSt && pSt.ph==='play'){ if (now() - pFlash.t > 700) pFlash = null; renderPlayer(); }
 }
 
 /* ================== старт ================== */
