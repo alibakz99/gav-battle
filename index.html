@@ -929,14 +929,14 @@ function hostFrame(){
     drawHead(c, SKINS[lp.skin], clamp(lp.open,0,1), true);
     c.restore();
   } else {
-    // ничья: косточка в центре
-    c.save(); c.translate(bx, ty + Math.sin(ts*8)*2*u);
-    c.fillStyle = '#fbf3e4'; c.strokeStyle='#14161f'; c.lineWidth = 3*u;
-    const bw = 34*u, br = 10*u;
-    c.beginPath(); c.rect(-bw, -6*u, bw*2, 12*u); c.fill(); c.stroke();
-    for (const sx of [-1,1]) for (const sy of [-1,1]){ c.beginPath(); c.arc(sx*bw, sy*6*u, br, 0, Math.PI*2); c.fill(); c.stroke(); }
-    c.beginPath(); c.rect(-bw, -5*u, bw*2, 10*u); c.fill();
-    c.restore();
+    // ровно: обе головы нос к носу в центре
+    const hs = u*0.95;
+    for (const [sd, dir] of [['L',1],['R',-1]]){
+      const pp = slotP(sd), sk = pp ? SKINS[pp.skin] : GHOST;
+      c.save(); c.translate(bx - dir*50*u, ty - 6*u); c.scale(dir*hs, hs); c.translate(-14, 4);
+      drawHead(c, sk, pp ? clamp(pp.open,0,1)*0.6 : 0, G.ph==='play' || G.ph==='count');
+      c.restore();
+    }
   }
   // собаки
   const ds = 1.75*u, lx = w*0.17, rx = w*0.83;
@@ -1145,12 +1145,17 @@ function renderPlayer(){
     // как на телевизоре: левый игрок слева, правый справа, косточка едет к лидеру
     const bone = (1 + d.pos) / 2 * 100;
     $('pTugL').style.width = bone.toFixed(1)+'%';
-    const hc = $('pHead'), k = Math.abs(d.pos), size = 40 + 46*k;
+    const hc = $('pHead'), k = Math.abs(d.pos), size = k < 0.025 ? 84 : 44 + 46*k;
     hc.style.left = bone.toFixed(1)+'%'; hc.style.width = hc.style.height = size.toFixed(0)+'px';
     const cx = hc.getContext('2d'); cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,160,160);
     const ld = d.pos > 0.025 ? d.L : d.pos < -0.025 ? d.R : null;
     if (ld){ cx.translate(80, 88); cx.scale(d.pos > 0 ? 1.55 : -1.55, 1.55); cx.translate(-14, 4); drawHead(cx, SKINS[skinIdx(ld.s)], d.ph==='play' ? 0.35 : 0.1, true); }
-    else { cx.font = '90px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('🦴', 80, 84); }
+    else {
+      for (const [x, dir, pl] of [[40, 1, d.L], [120, -1, d.R]]){
+        cx.setTransform(1,0,0,1,0,0); cx.translate(x, 92); cx.scale(dir*0.8, 0.8); cx.translate(-14, 4);
+        drawHead(cx, pl ? SKINS[skinIdx(pl.s)] : GHOST, 0, d.ph==='play');
+      }
+    }
     const nm = (x, side) => (x ? x.n : '—') + (d.you===side ? ' (ты)' : '') + ' · ' + (x ? x.b : 0);
     $('pNameL').textContent = nm(d.L, 'L'); $('pNameR').textContent = nm(d.R, 'R');
     $('pTime').textContent = d.ph==='play' ? Math.ceil(d.rem) + ' с' : '';
