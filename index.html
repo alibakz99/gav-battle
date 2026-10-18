@@ -133,6 +133,7 @@ h1,h2{margin:0;text-wrap:balance}
 <!-- ВХОД ИГРОКА -->
 <section id="join" class="screen" hidden>
   <div class="col">
+    <button id="joinBack" type="button" style="align-self:flex-start;padding:10px 14px">← Назад</button>
     <div class="logo" style="font-size:26px">КТО КОГО <span>ПЕРЕГАВКАЕТ</span></div>
     <div class="card">
       <label class="label" for="codeIn">Код комнаты</label>
@@ -193,7 +194,7 @@ h1,h2{margin:0;text-wrap:balance}
     <button id="hPanel">👥 Игроки</button>
     <button id="hSound" title="Звуки игры">🔊</button>
     <button id="hFull">⛶</button>
-    <button id="hExit">Выход</button>
+    <button id="hExit">← Меню</button>
   </div>
   <aside id="drawer" hidden>
     <div class="drawer-top"><span class="label">Управление</span><button id="drawerClose" aria-label="Закрыть">✕</button></div>
@@ -491,7 +492,8 @@ function hostBark(id, str, n){
   const side = id===G.L ? 'L' : id===G.R ? 'R' : null;
   if (!side || G.ph !== 'play') return;
   str = clamp(+str||0, 0, 1);
-  G.pos = clamp(G.pos + (side==='L' ? -1 : 1) * (BARK_PULL + BARK_PULL_LOUD*str), -1, 1);
+  // лай толкает косточку на сторону соперника: левый толкает вправо (+), правый влево (−)
+  G.pos = clamp(G.pos + (side==='L' ? 1 : -1) * (BARK_PULL + BARK_PULL_LOUD*str), -1, 1);
   p.barks++; p.kick = 1; pops.push({s:side, t0:now(), r:Math.random()}); Snd.gav(side);
 }
 function hostLong(id, n){
@@ -507,7 +509,7 @@ const banned = new Set();
 function hostStart(training, stream){
   streamMode = !!stream;
   mode = training ? 'train' : 'host'; show('host'); keepAwake(); Snd.unlock();
-  $('hExit').hidden = !training; $('hSwap').hidden = !!training; $('hHear').hidden = !!training; $('hVol').hidden = !!training; $('hPanel').hidden = !!training;
+  $('hSwap').hidden = !!training; $('hHear').hidden = !!training; $('hVol').hidden = !!training; $('hPanel').hidden = !!training;
   resizeStage(); requestAnimationFrame(hostFrame);
   if (training){
     $('qrCard').hidden = true; $('netState').textContent = 'Тренировка';
@@ -621,6 +623,12 @@ function hostCmd(m){
   if (!m || typeof m !== 'object') return;
   const p = m.id ? players.get(String(m.id)) : null;
   if (m.c === 'ok' && p){ p.ok = true; p.okAt = Date.now(); assignSlots(); }
+  else if (m.c === 'unok' && p){
+    p.ok = false; p.okAt = 0; p.rdy = false;
+    let was = false; for (const sd of ['L','R']) if (G[sd] === p.id){ G[sd] = null; was = true; }
+    if (was && G.ph !== 'lobby') toLobby();
+    assignSlots();
+  }
   else if (m.c === 'kick' && p) kickPlayer(p, 'kick');
   else if (m.c === 'ban' && p){ banned.add(p.id); kickPlayer(p, 'ban'); }
   else if (m.c === 'start') $('hStart').onclick();
@@ -660,8 +668,8 @@ function hostTick(dt){
     if (e >= 3.2){ G.ph = 'play'; G.endAt = t + G.dur*1000; Snd.beep(880,0.25); Snd.beep(1320,0.2,0.12); }
   } else if (G.ph === 'play'){
     if (!L || !R){ toLobby(); return; }
-    if (G.pos <= -1) finish('L'); else if (G.pos >= 1) finish('R');
-    else if (t >= G.endAt) finish(Math.abs(G.pos) < 0.02 ? 'draw' : (G.pos < 0 ? 'L' : 'R'));
+    if (G.pos >= 1) finish('L'); else if (G.pos <= -1) finish('R');
+    else if (t >= G.endAt) finish(Math.abs(G.pos) < 0.02 ? 'draw' : (G.pos > 0 ? 'L' : 'R'));
   }
 }
 function finish(w){
@@ -702,7 +710,12 @@ $('hSwap').onclick = () => {
 };
 $('hSound').onclick = () => { sound = !sound; $('hSound').textContent = sound ? '🔊' : '🔇'; };
 $('hFull').onclick = () => { try{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }catch(e){} };
-$('hExit').onclick = () => location.href = location.pathname;
+let exitArm = 0;
+$('hExit').onclick = () => {
+  if (mode === 'train' || Date.now() - exitArm < 4000){ try{ sessionStorage.removeItem('gav_host_code'); }catch(e){} location.href = location.pathname; return; }
+  exitArm = Date.now(); $('hExit').textContent = 'Точно выйти? Комната закроется'; $('hExit').classList.add('pn-bad');
+  setTimeout(() => { $('hExit').textContent = '← Меню'; $('hExit').classList.remove('pn-bad'); }, 4000);
+};
 let barTimer = 0;
 function pokeBar(){ $('hostBar').classList.remove('hide'); clearTimeout(barTimer); barTimer = setTimeout(()=>{ if (G.ph==='play'||G.ph==='count') $('hostBar').classList.add('hide'); }, 3000); }
 window.addEventListener('mousemove', () => { if (mode==='host'||mode==='train') pokeBar(); });
@@ -734,11 +747,13 @@ function renderPanel(el, s, cmd){
   const row = (x, btns, side) => '<div class="pn-item"><span class="dot" style="background:' + (!x.c ? 'var(--muted)' : x.m==='ok' ? 'var(--ok)' : 'var(--bad)') + '"></span>' +
     '<div class="who"><b class="' + (side||'') + '">' + escH(x.n) + '</b><small>' + (x.c ? escH(MIC_NAME[x.m] || 'микрофон ?') : 'нет связи') + ' · ' + ago(x.j) + '</small></div><div class="pn-btns">' + btns + '</div></div>';
   const b = (c, id, t, cls) => '<button type="button" data-c="' + c + '" data-id="' + escH(id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + t + '</button>';
-  const playing = ['L','R'].map(sd => s[sd] && by(s[sd]) ? row(by(s[sd]), b('kick', s[sd], 'Убрать'), sd==='L'?'side-l':'side-r') : '<div class="pn-empty">' + (sd==='L'?'Слева':'Справа') + ': свободно</div>').join('');
+  const back = id => s.stream ? b('unok', id, '↩ В ожидание') : '';
+  const playing = ['L','R'].map(sd => s[sd] && by(s[sd]) ? row(by(s[sd]), back(s[sd]) + b('kick', s[sd], 'Убрать'), sd==='L'?'side-l':'side-r') : '<div class="pn-empty">' + (sd==='L'?'Слева':'Справа') + ': свободно</div>').join('');
   const queue = s.items.filter(x => x.ok && x.c && x.id!==s.L && x.id!==s.R).sort((a,c)=>a.o-c.o);
   const wait = s.items.filter(x => !x.ok).sort((a,c)=>a.j-c.j);
   const live = s.ph==='play' || s.ph==='count';
   el.innerHTML =
+    (el.id === 'panelBody' ? '<div class="pn-row"><button type="button" data-c="focus">← К экрану игры</button></div><div class="pn-empty">Экран игры открыт на вкладке «Кто кого перегавкает». Эту панель держи отдельно, в эфир её не показывай.</div>' : '') +
     '<div class="pn-head"><b>' + escH(s.code || '····') + '</b><span class="sub">' + (s.stream ? '🔴 Эфир · ' : '') + PH_NAME[s.ph] + '</span></div>' +
     '<div class="pn-row">' +
       '<button type="button" class="btn-main" data-c="start"' + (!live && !s.can ? ' disabled' : '') + '>' + (live ? 'Стоп' : s.ph==='over' ? 'Реванш' : 'Старт') + '</button>' +
@@ -747,7 +762,7 @@ function renderPanel(el, s, cmd){
     '</div>' +
     '<button type="button" data-c="hideBar" data-v="' + (s.hideBar ? '0' : '1') + '">' + (s.hideBar ? '👁 Показать кнопки на экране игры' : '🙈 Скрыть кнопки с экрана игры (для эфира)') + '</button>' +
     '<h3>Играют сейчас</h3>' + playing +
-    '<h3>Очередь · пущены (' + queue.length + ')</h3>' + (queue.length ? queue.map(x => row(x, b('kick', x.id, 'Убрать'))).join('') : '<div class="pn-empty">Пусто</div>') +
+    '<h3>Очередь · пущены (' + queue.length + ')</h3>' + (queue.length ? queue.map(x => row(x, back(x.id) + b('kick', x.id, 'Убрать'))).join('') : '<div class="pn-empty">Пусто</div>') +
     (s.stream ? '<h3>Ждут допуска (' + wait.length + ')</h3>' + (wait.length ? wait.map(x => row(x, b('ok', x.id, 'Пустить играть', 'pn-ok') + b('kick', x.id, 'Убрать') + b('ban', x.id, 'Бан', 'pn-bad'))).join('') : '<div class="pn-empty">Пока никто не ждёт. Зрители заходят по QR-коду с экрана.</div>') : '');
 }
 setInterval(() => {
@@ -769,7 +784,11 @@ function panelStart(){
   mode = 'panel'; show('panelPage'); document.title = 'Панель · Кто кого перегавкает';
   if (!chan){ $('panelBody').innerHTML = '<p class="err">Этот браузер не поддерживает отдельное окно панели. Нажми «👥 Игроки» на экране игры и управляй оттуда.</p>'; return; }
   let last = 0;
-  chan.onmessage = e => { const d = e.data; if (d && d.t === 'state'){ last = Date.now(); renderPanel($('panelBody'), d.s, cmd => chan.postMessage(Object.assign({t:'cmd'}, cmd))); } };
+  const send = cmd => {
+    if (cmd.c === 'focus'){ try{ if (window.opener && !window.opener.closed){ window.opener.focus(); return; } }catch(e){} return; }
+    chan.postMessage(Object.assign({t:'cmd'}, cmd));
+  };
+  chan.onmessage = e => { const d = e.data; if (d && d.t === 'state'){ last = Date.now(); renderPanel($('panelBody'), d.s, send); } };
   setInterval(() => { if (Date.now() - last > 3000){ $('panelBody')._key = ''; $('panelBody').innerHTML = '<p class="sub">Нет связи с экраном игры. Открой «Экран для эфира TikTok» в этом же браузере.</p>'; } }, 1500);
 }
 
@@ -868,9 +887,7 @@ function hostFrame(){
   const bx = mid + posShow*half;
   c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.roundRect ? c.roundRect(tx0-6*u, ty-18*u, tx1-tx0+12*u, 36*u, 18*u) : c.rect(tx0,ty-18*u,tx1-tx0,36*u); c.fill();
   c.fillStyle = 'rgba(245,239,230,.12)'; c.fillRect(tx0, ty-12*u, tx1-tx0, 24*u);
-  c.fillStyle = bx < mid ? '#ff9f43' : '#4cc9f0'; c.fillRect(Math.min(bx, mid), ty-12*u, Math.abs(bx-mid), 24*u);
-  c.font = `800 ${20*u}px Rubik, sans-serif`; c.textAlign='center'; c.textBaseline='middle';
-  c.fillStyle = '#ff9f43'; c.fillText('◀', tx0 - 26*u, ty); c.fillStyle = '#4cc9f0'; c.fillText('▶', tx1 + 26*u, ty);
+  c.fillStyle = bx > mid ? '#ff9f43' : '#4cc9f0'; c.fillRect(Math.min(bx, mid), ty-12*u, Math.abs(bx-mid), 24*u);
   c.fillStyle = 'rgba(245,239,230,.8)'; c.fillRect(mid-1.5*u, ty-22*u, 3*u, 44*u);
   // косточка
   c.save(); c.translate(bx, ty - 2*u + Math.sin(ts*8)*2*u); c.rotate(Math.sin(ts*3)*0.08);
@@ -884,7 +901,7 @@ function hostFrame(){
   const ds = 1.75*u, lx = w*0.17, rx = w*0.83;
   for (const [side, p, x, flip] of [['L',L,lx,false],['R',R,rx,true]]){
     const sk = p ? SKINS[p.skin] : GHOST, op = p ? clamp(p.open,0,1) : 0;
-    const lean = side==='L' ? -G.pos : G.pos; // косточка ближе — собака радостнее
+    const lean = side==='L' ? G.pos : -G.pos; // косточка у соперника — собака радостнее
     drawDog(c, x, gy + 20*u, ds*(1 + Math.max(0,lean)*0.06), sk, op, ts + (side==='L'?0:1.3), flip);
     // звуковые волны
     if (p && op > 0.15){
@@ -920,7 +937,8 @@ function hostFrame(){
     c.fillStyle = '#f2b33d'; c.fillText('ПЕРЕГАВКАЕТ', w/2, 165*u);
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
     c.font = `400 ${24*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.65)';
-    c.fillText('Лайте отрывисто: «ГАВ! ГАВ!» Долгий крик не считается', w/2, 300*u);
+    c.fillText('Лай толкает косточку к сопернику. Дотолкал до края — победил!', w/2, 300*u);
+    c.fillText('Считается только отрывистое «ГАВ! ГАВ!», долгий крик — нет', w/2, 332*u);
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
     const msg = !L || !R ? (streamMode ? 'Задонать, напиши ник в чат и сканируй QR-код' : 'Сканируйте QR-код и выберите собаку') : (!micOk(L)||!micOk(R)) ? 'Ждём, пока оба включат микрофон' : (!L.rdy||!R.rdy) ? 'Нажмите «Я готов» на телефонах' : '';
     c.fillText(msg, w/2, 225*u);
@@ -1074,7 +1092,7 @@ function renderPlayer(){
   } else if (d.ph === 'count'){
     state = d.cnt > 1.1 ? 'ТИШИНА… ' + Math.ceil(d.cnt) : 'ПРИГОТОВЬСЯ!'; note = 'Не шуми, измеряем шум зала.';
   } else if (d.ph === 'play'){
-    state = 'ЛАЙ!!!'; note = 'Коротко и громко: ГАВ! ГАВ! Долгий крик не считается.';
+    state = 'ЛАЙ!!!'; note = 'Толкай косточку к сопернику: коротко и громко ГАВ! ГАВ!';
     if (pFlash && now() - pFlash.t < 700){ state = pFlash.ok ? 'ГАВ! ✔' : 'Это не гав!'; note = pFlash.ok ? 'Засчитано, ещё!' : 'Слишком долго. Лай коротко: ГАВ!'; }
   }
   else if (d.ph === 'over'){
@@ -1088,11 +1106,11 @@ function renderPlayer(){
     $('pBone').style.left = bone.toFixed(1)+'%';
     $('pTugL').style.left = Math.min(bone, 50).toFixed(1)+'%';
     $('pTugL').style.width = Math.abs(bone - 50).toFixed(1)+'%';
-    $('pTugL').style.background = d.pos < 0 ? 'var(--left)' : 'var(--right)';
+    $('pTugL').style.background = d.pos > 0 ? 'var(--left)' : 'var(--right)';
     const nm = (x, side) => (x ? x.n : '—') + (d.you===side ? ' (ты)' : '') + ' · ' + (x ? x.b : 0);
-    $('pNameL').textContent = '◀ ' + nm(d.L, 'L'); $('pNameR').textContent = nm(d.R, 'R') + ' ▶';
+    $('pNameL').textContent = nm(d.L, 'L'); $('pNameR').textContent = nm(d.R, 'R');
     $('pTime').textContent = d.ph==='play' ? Math.ceil(d.rem) + ' с' : '';
-    const mine = d.you==='L' ? -d.pos : d.pos;
+    const mine = d.you==='L' ? d.pos : -d.pos;
     $('pLead').textContent = Math.abs(d.pos) < 0.03 ? 'Ровно' : mine > 0 ? 'Ты ведёшь! 🦴' : 'Соперник ведёт, гавкай!';
     $('pLead').style.color = Math.abs(d.pos) < 0.03 ? 'var(--muted)' : mine > 0 ? 'var(--ok)' : 'var(--bad)';
   }
@@ -1121,6 +1139,7 @@ function playerFrame(){
 }
 
 /* ================== старт ================== */
+$('joinBack').onclick = () => { location.href = location.pathname; };
 $('goHost').onclick = () => hostStart(false, false);
 $('goStream').onclick = () => hostStart(false, true);
 $('goJoin').onclick = () => joinScreen('');
