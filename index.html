@@ -64,8 +64,10 @@ h1,h2{margin:0;text-wrap:balance}
 #pDog{width:100%;max-width:360px;aspect-ratio:1.25/1;align-self:center}
 .pstate{font-family:var(--display);font-size:clamp(22px,7vw,34px);text-align:center;line-height:1.1;min-height:1.2em}
 .pnote{text-align:center;color:var(--muted);min-height:1.4em}
-.tug{height:22px;border-radius:11px;position:relative;overflow:hidden;background:var(--right)}
-.tug i{position:absolute;inset:0 auto 0 0;background:var(--left);width:50%}
+.tug{height:22px;border-radius:11px;position:relative;overflow:hidden;background:var(--card2)}
+.tug i{position:absolute;top:0;bottom:0;left:50%;width:0;background:var(--left)}
+.tug::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--cream);opacity:.6}
+.lead{text-align:center;font-weight:800;font-size:18px;min-height:1.3em}
 .tug em{position:absolute;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;font-style:normal;font-size:22px;line-height:30px;text-align:center}
 .stats{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;font-weight:600}
 #rdyBtn{padding:22px;font-size:20px}
@@ -89,6 +91,25 @@ h1,h2{margin:0;text-wrap:balance}
 #hostBar .seg button[aria-pressed="true"]{background:var(--gold);color:var(--ink)}
 #hostBar.hide{opacity:0;pointer-events:none}
 #netState{font-size:13px;color:var(--muted);padding:0 6px}
+#drawer{position:absolute;top:0;right:0;bottom:0;width:min(440px,100vw);background:var(--ink);border-left:2px solid var(--line);overflow-y:auto;padding:16px;padding-right:max(16px,env(safe-area-inset-right,0px));z-index:5}
+.drawer-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pn{display:flex;flex-direction:column;gap:12px}
+.pn-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pn-head b{font-family:var(--display);font-size:22px;letter-spacing:.06em}
+.pn-row{display:flex;flex-wrap:wrap;gap:6px}
+.pn-row button{padding:10px 12px;font-size:15px}
+.pn-row button[aria-pressed="true"]{background:var(--gold);color:var(--ink)}
+.pn h3{margin:8px 0 0;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.pn-item{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:10px 12px}
+.pn-item .who{flex:1;min-width:0}
+.pn-item .who b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn-item small{color:var(--muted)}
+.pn-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pn-btns button{padding:8px 10px;font-size:14px}
+.pn-ok{background:var(--ok)!important;color:var(--ink)}
+.pn-bad{background:#4a2530!important;color:#ffb3bc}
+.pn-empty{color:var(--muted);font-size:14px;padding:4px 2px}
+.side-l{color:var(--left)} .side-r{color:var(--right)}
 #trainMic{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,22,31,.92);padding:16px}
 @media (prefers-reduced-motion:reduce){.meter i{transition:none}}
 </style>
@@ -101,7 +122,8 @@ h1,h2{margin:0;text-wrap:balance}
     <div class="logo">КТО КОГО<br><span>ПЕРЕГАВКАЕТ</span></div>
     <p class="sub">Двое лают в телефоны. Чей лай громче и дольше, тот перетягивает косточку.</p>
     <div class="big-choice">
-      <button id="goHost" class="btn-main"><span class="ico">📺</span><span>Экран для трансляции<small style="color:#4a3a14">Открой на ноутбуке у телевизора</small></span></button>
+      <button id="goHost" class="btn-main"><span class="ico">📺</span><span>Экран для мероприятия<small style="color:#4a3a14">Ноутбук у телевизора, игроки заходят сразу</small></span></button>
+      <button id="goStream"><span class="ico">🔴</span><span>Экран для эфира TikTok<small>Играют только те, кого ты пустишь</small></span></button>
       <button id="goJoin"><span class="ico">📱</span><span>Я игрок<small>Войти по коду комнаты</small></span></button>
       <button id="goTrain"><span class="ico">🤖</span><span>Тренировка с ботом<small>Проверить игру одному</small></span></button>
     </div>
@@ -115,8 +137,8 @@ h1,h2{margin:0;text-wrap:balance}
     <div class="card">
       <label class="label" for="codeIn">Код комнаты</label>
       <input id="codeIn" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Например, K7QF" style="font-family:var(--display);letter-spacing:.15em;text-transform:uppercase">
-      <label class="label" for="nickIn">Твоё имя</label>
-      <input id="nickIn" maxlength="16" autocomplete="nickname" placeholder="Имя на экране">
+      <label class="label" for="nickIn">Твоё имя или ник в TikTok</label>
+      <input id="nickIn" maxlength="16" autocomplete="nickname" placeholder="Как тебя показать на экране">
       <span class="label">Собака</span>
       <div class="skins" id="skinsJoin"></div>
     </div>
@@ -137,11 +159,17 @@ h1,h2{margin:0;text-wrap:balance}
     <div class="pnote" id="pNote"></div>
     <div id="pGame" hidden class="card" style="gap:8px">
       <div class="tug"><i id="pTugL"></i><em id="pBone">🦴</em></div>
-      <div class="stats"><span id="pMe"></span><span id="pTime"></span><span id="pThem"></span></div>
+      <div class="stats"><span id="pNameL" style="color:var(--left)"></span><span id="pTime"></span><span id="pNameR" style="color:var(--right)"></span></div>
+      <div class="lead" id="pLead"></div>
     </div>
     <div id="micBoxPlay"></div>
     <button id="rdyBtn" class="btn-main">Я готов</button>
   </div>
+</section>
+
+<!-- ПАНЕЛЬ УПРАВЛЕНИЯ (отдельное окно) -->
+<section id="panelPage" class="screen" hidden>
+  <div class="col"><div id="panelBody" class="pn"><p class="sub">Ищу экран игры… Открой «Экран для эфира» в другой вкладке этого же браузера.</p></div></div>
 </section>
 
 <!-- ЭКРАН ТВ -->
@@ -160,10 +188,17 @@ h1,h2{margin:0;text-wrap:balance}
     </div>
     <button id="hStart" class="btn-main">Старт</button>
     <button id="hSwap">Сменить игроков</button>
-    <button id="hSound">🔊</button>
+    <button id="hHear" aria-pressed="true" title="Живой лай игроков в колонках">🎙 Лай: вкл</button>
+    <input id="hVol" type="range" min="0" max="1" step="0.05" value="0.8" aria-label="Громкость живого лая" style="width:90px;padding:0;accent-color:var(--gold)">
+    <button id="hPanel">👥 Игроки</button>
+    <button id="hSound" title="Звуки игры">🔊</button>
     <button id="hFull">⛶</button>
     <button id="hExit">Выход</button>
   </div>
+  <aside id="drawer" hidden>
+    <div class="drawer-top"><span class="label">Управление</span><button id="drawerClose" aria-label="Закрыть">✕</button></div>
+    <div id="drawerBody" class="pn"></div>
+  </aside>
   <div id="trainMic" hidden>
     <div class="col">
       <div class="logo" style="font-size:24px">ТРЕНИРОВКА</div>
@@ -187,7 +222,8 @@ const store = {
   get(k, d){ try{ const v = localStorage.getItem('gav_'+k); return v === null ? d : v; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem('gav_'+k, v); }catch(e){} }
 };
-function show(id){ for (const s of ['menu','join','player','host']) $(s).hidden = (s !== id); }
+function show(id){ for (const s of ['menu','join','player','host','panelPage']) $(s).hidden = (s !== id); }
+const escH = t => String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ID_PREFIX = 'gavbattle-kz-';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function genCode(){ let s=''; for(let i=0;i<4;i++) s += CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]; return s; }
@@ -416,7 +452,7 @@ function micChanged(){
   micBoxes.forEach(renderMicBox);
   if (net.conn) send({t:'mic', m: Mic.status==='on' ? 'ok' : Mic.status});
   if (mode==='train') $('trainGo').disabled = Mic.status !== 'on';
-  if (mode==='player') updateReadyBtn();
+  if (mode==='player'){ updateReadyBtn(); if (Mic.status==='on') startCall(); }
 }
 async function micInitStatus(){
   if (Mic.active) return micChanged();
@@ -466,9 +502,12 @@ function hostLong(id, n){
   p.longs = (p.longs||0) + 1; pops.push({s:side, t0:now(), r:Math.random(), bad:true});
 }
 
-function hostStart(training){
+let streamMode = false, hideBar = false;
+const banned = new Set();
+function hostStart(training, stream){
+  streamMode = !!stream;
   mode = training ? 'train' : 'host'; show('host'); keepAwake(); Snd.unlock();
-  $('hExit').hidden = !training; $('hSwap').hidden = !!training;
+  $('hExit').hidden = !training; $('hSwap').hidden = !!training; $('hHear').hidden = !!training; $('hVol').hidden = !!training; $('hPanel').hidden = !!training;
   resizeStage(); requestAnimationFrame(hostFrame);
   if (training){
     $('qrCard').hidden = true; $('netState').textContent = 'Тренировка';
@@ -493,12 +532,38 @@ function openHostPeer(code){
     else $('netState').textContent = 'Ошибка связи: ' + e.type;
   });
   peer.on('disconnected', () => { $('netState').textContent = 'Переподключение…'; setTimeout(()=>{ try{ if (!peer.destroyed) peer.reconnect(); }catch(e){} }, 1500); });
+  peer.on('call', call => {
+    try{ call.answer(); }catch(e){ return; }
+    const id = String(call.metadata && call.metadata.id || '').replace(/[^a-z0-9]/gi,'').slice(0,24);
+    call.on('stream', st => hostAudio(id, st, call));
+    call.on('error', () => {});
+  });
   peer.on('connection', conn => {
     conn.on('data', d => hostMsg(conn, d));
     conn.on('close', () => hostClose(conn));
     conn.on('error', () => hostClose(conn));
   });
 }
+/* живой лай: голос с телефонов играет в колонках экрана */
+const audioEls = new Map();
+let hearBarks = true, hearVol = 0.8;
+function hostAudio(id, st, call){
+  if (!id) return;
+  let a = audioEls.get(id);
+  if (a && a.call && a.call !== call){ try{ a.call.close(); }catch(e){} }
+  if (!a){ const el = document.createElement('audio'); el.autoplay = true; el.setAttribute('playsinline',''); $('host').append(el); a = {el}; audioEls.set(id, a); }
+  a.call = call; a.el.srcObject = st; a.el.play().catch(()=>{});
+}
+function updateAudio(){
+  for (const [id, a] of audioEls){
+    if (!players.has(id)){ a.el.srcObject = null; a.el.remove(); try{ a.call && a.call.close(); }catch(e){} audioEls.delete(id); continue; }
+    const on = hearBarks && (id === G.L || id === G.R);
+    a.el.muted = !on; a.el.volume = hearVol;
+    if (on && a.el.paused) a.el.play().catch(()=>{});
+  }
+}
+$('hHear').onclick = () => { hearBarks = !hearBarks; $('hHear').setAttribute('aria-pressed', hearBarks); $('hHear').textContent = hearBarks ? '🎙 Лай: вкл' : '🎙 Лай: выкл'; };
+$('hVol').oninput = () => { hearVol = +$('hVol').value; };
 function showQR(code){
   const url = location.origin + location.pathname + '?room=' + code;
   $('qrCard').hidden = false; $('qrCode').textContent = code; $('qrUrl').textContent = url.replace(/^https?:\/\//,'');
@@ -509,9 +574,10 @@ function hostMsg(conn, d){
   if (!d || typeof d !== 'object') return;
   if (d.t === 'hello'){
     const id = String(d.id||'').replace(/[^a-z0-9]/gi,'').slice(0,24) || conn.peer;
+    if (banned.has(id)){ try{ conn.send({t:'bye', why:'ban'}); }catch(e){} setTimeout(()=>{ try{ conn.close(); }catch(e){} }, 400); return; }
     let p = players.get(id);
     if (p && p.conn && p.conn !== conn){ try{ p.conn.close(); }catch(e){} }
-    if (!p){ p = {id, joinedAt:Date.now(), barks:0, p:0, l:0, rdy:false, above:false, lastOn:0, open:0}; players.set(id, p); }
+    if (!p){ p = {id, joinedAt:Date.now(), barks:0, p:0, l:0, rdy:false, open:0, ok:!streamMode}; p.okAt = p.ok ? p.joinedAt : 0; players.set(id, p); }
     p.conn = conn; conn._pid = id; p.connected = true; p.goneAt = 0;
     p.nick = cleanNick(d.nick) || 'Игрок'; p.skin = skinIdx(d.skin); p.mic = String(d.mic||'idle').slice(0,12);
     assignSlots(); return;
@@ -530,11 +596,37 @@ function hostClose(conn){
 }
 function assignSlots(){
   for (const s of ['L','R']) if (G[s] && !players.has(G[s])) G[s] = null;
-  const waiting = [...players.values()].filter(p => p.connected && p.id!==G.L && p.id!==G.R && !p.bot && !p.local).sort((a,b)=>a.joinedAt-b.joinedAt);
+  const waiting = approvedQueue();
   let changed = false;
   if (!G.L && waiting.length){ G.L = waiting.shift().id; changed = true; }
   if (!G.R && waiting.length){ G.R = waiting.shift().id; changed = true; }
   if (changed && G.ph !== 'lobby') toLobby();
+}
+function approvedQueue(){ return [...players.values()].filter(p => p.connected && p.ok && p.id!==G.L && p.id!==G.R && !p.bot && !p.local).sort((a,b)=>a.okAt-b.okAt); }
+function waitingList(){ return [...players.values()].filter(p => !p.ok && !p.bot && !p.local).sort((a,b)=>a.joinedAt-b.joinedAt); }
+function kickPlayer(p, why){
+  try{ p.conn && p.conn.send({t:'bye', why}); }catch(e){}
+  const c = p.conn; setTimeout(()=>{ try{ c && c.close(); }catch(e){} }, 400);
+  players.delete(p.id);
+  let wasPlaying = false;
+  for (const s of ['L','R']) if (G[s] === p.id){ G[s] = null; wasPlaying = true; }
+  if (wasPlaying && G.ph !== 'lobby') toLobby();
+  assignSlots();
+}
+function setDur(v){
+  if (G.ph==='play' || G.ph==='count' || ![15,30,60].includes(v)) return;
+  G.dur = v; document.querySelectorAll('#hostBar .seg button').forEach(x => x.setAttribute('aria-pressed', +x.dataset.dur===v ? 'true':'false'));
+}
+function hostCmd(m){
+  if (!m || typeof m !== 'object') return;
+  const p = m.id ? players.get(String(m.id)) : null;
+  if (m.c === 'ok' && p){ p.ok = true; p.okAt = Date.now(); assignSlots(); }
+  else if (m.c === 'kick' && p) kickPlayer(p, 'kick');
+  else if (m.c === 'ban' && p){ banned.add(p.id); kickPlayer(p, 'ban'); }
+  else if (m.c === 'start') $('hStart').onclick();
+  else if (m.c === 'swap') $('hSwap').onclick();
+  else if (m.c === 'dur') setDur(+m.v);
+  else if (m.c === 'hideBar'){ hideBar = m.v === '1'; $('hostBar').hidden = hideBar; }
 }
 function toLobby(){ G.ph='lobby'; G.pos=0; G.win=null; for (const p of players.values()){ p.rdy=false; } }
 function slotP(s){ return G[s] ? players.get(G[s]) : null; }
@@ -545,6 +637,7 @@ function startCount(){
   G.ph = 'count'; G.cntAt = now(); G.pos = 0; G.win = null; pops.length = 0; confetti.length = 0;
   for (const s of ['L','R']){ const p = slotP(s); p.barks = 0; p.longs = 0; p.rdy = false; }
   if (mode==='train') micCalibStart();
+  pokeBar();
 }
 function hostTick(dt){
   const t = now();
@@ -591,23 +684,20 @@ function pub(p){ return p ? {n:p.nick, s:p.skin, b:p.barks, m:p.mic, r:p.rdy, c:
 let lastBroadcast = 0;
 function broadcast(){
   const t = now(); if (t - lastBroadcast < 50) return; lastBroadcast = t;
-  const q = [...players.values()].filter(p=>p.connected && p.id!==G.L && p.id!==G.R).sort((a,b)=>a.joinedAt-b.joinedAt);
+  const q = approvedQueue();
   const base = {t:'st', ph:G.ph, pos:+G.pos.toFixed(3), dur:G.dur, cnt: G.ph==='count' ? Math.max(0, 3 - (t-G.cntAt)/1000) : 0,
-    rem: G.ph==='play' ? Math.max(0, (G.endAt - t)/1000) : (G.ph==='lobby' ? G.dur : 0), win:G.win, L:pub(slotP('L')), R:pub(slotP('R'))};
+    rem: G.ph==='play' ? Math.max(0, (G.endAt - t)/1000) : (G.ph==='lobby' ? G.dur : 0), win:G.win, L:pub(slotP('L')), R:pub(slotP('R')), stream:streamMode};
   for (const p of players.values()){
     if (!p.conn || !p.conn.open) continue;
-    const you = p.id===G.L ? 'L' : p.id===G.R ? 'R' : 'Q';
+    const you = p.id===G.L ? 'L' : p.id===G.R ? 'R' : p.ok ? 'Q' : 'W';
     try{ p.conn.send(Object.assign({}, base, {you, qpos: you==='Q' ? q.indexOf(p)+1 : 0})); }catch(e){}
   }
 }
 // кнопки ведущего
-document.querySelectorAll('#hostBar .seg button').forEach(b => b.onclick = () => {
-  if (G.ph==='play' || G.ph==='count') return;
-  G.dur = +b.dataset.dur; document.querySelectorAll('#hostBar .seg button').forEach(x => x.setAttribute('aria-pressed', x===b ? 'true':'false'));
-});
+document.querySelectorAll('#hostBar .seg button').forEach(b => b.onclick = () => setDur(+b.dataset.dur));
 $('hStart').onclick = () => { if (G.ph==='play' || G.ph==='count'){ toLobby(); return; } startCount(); };
 $('hSwap').onclick = () => {
-  for (const s of ['L','R']){ const p = slotP(s); if (p){ try{ p.conn && p.conn.send({t:'bye'}); }catch(e){} const c = p.conn; setTimeout(()=>{ try{ c && c.close(); }catch(e){} }, 400); players.delete(p.id); } G[s] = null; }
+  for (const s of ['L','R']){ const p = slotP(s); if (p) kickPlayer(p, 'swap'); }
   toLobby(); assignSlots();
 };
 $('hSound').onclick = () => { sound = !sound; $('hSound').textContent = sound ? '🔊' : '🔇'; };
@@ -625,6 +715,63 @@ $('trainGo').onclick = () => {
   Det.onBark = (s, n) => hostBark('me', s, n);
   Det.onLong = (n) => hostLong('me', n);
 };
+
+/* ---------- панель управления: отдельное окно или выдвижная панель ---------- */
+const chan = ('BroadcastChannel' in window) ? new BroadcastChannel('gav-panel') : null;
+const PH_NAME = {lobby:'Лобби', count:'Отсчёт', play:'Раунд идёт', over:'Итоги'};
+const MIC_NAME = {ok:'микрофон ок', idle:'микрофон не включён', prompt:'микрофон не включён', granted:'микрофон не включён', denied:'микрофон запрещён', nomic:'нет микрофона', busy:'микрофон занят', lost:'микрофон отключился'};
+function panelState(){
+  return {code:net.code, ph:G.ph, dur:G.dur, stream:streamMode, hideBar, can:canStart(), L:G.L, R:G.R,
+    items:[...players.values()].filter(p=>!p.local && !p.bot).map(p=>({id:p.id, n:p.nick, ok:!!p.ok, c:!!p.connected, m:p.mic, j:p.joinedAt, o:p.okAt||0}))};
+}
+function ago(ms){ const m = Math.floor((Date.now()-ms)/60000); return m < 1 ? 'только что' : m + ' мин назад'; }
+function renderPanel(el, s, cmd){
+  const key = JSON.stringify(s) + Math.floor(Date.now()/30000);
+  if (el._key === key) return; el._key = key;
+  if (!el._wired){ el._wired = true; el.addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (b && !b.disabled) el._cmd({c:b.dataset.c, id:b.dataset.id, v:b.dataset.v}); }); }
+  el._cmd = cmd;
+  const by = id => s.items.find(x => x.id === id);
+  const row = (x, btns, side) => '<div class="pn-item"><span class="dot" style="background:' + (!x.c ? 'var(--muted)' : x.m==='ok' ? 'var(--ok)' : 'var(--bad)') + '"></span>' +
+    '<div class="who"><b class="' + (side||'') + '">' + escH(x.n) + '</b><small>' + (x.c ? escH(MIC_NAME[x.m] || 'микрофон ?') : 'нет связи') + ' · ' + ago(x.j) + '</small></div><div class="pn-btns">' + btns + '</div></div>';
+  const b = (c, id, t, cls) => '<button type="button" data-c="' + c + '" data-id="' + escH(id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + t + '</button>';
+  const playing = ['L','R'].map(sd => s[sd] && by(s[sd]) ? row(by(s[sd]), b('kick', s[sd], 'Убрать'), sd==='L'?'side-l':'side-r') : '<div class="pn-empty">' + (sd==='L'?'Слева':'Справа') + ': свободно</div>').join('');
+  const queue = s.items.filter(x => x.ok && x.c && x.id!==s.L && x.id!==s.R).sort((a,c)=>a.o-c.o);
+  const wait = s.items.filter(x => !x.ok).sort((a,c)=>a.j-c.j);
+  const live = s.ph==='play' || s.ph==='count';
+  el.innerHTML =
+    '<div class="pn-head"><b>' + escH(s.code || '····') + '</b><span class="sub">' + (s.stream ? '🔴 Эфир · ' : '') + PH_NAME[s.ph] + '</span></div>' +
+    '<div class="pn-row">' +
+      '<button type="button" class="btn-main" data-c="start"' + (!live && !s.can ? ' disabled' : '') + '>' + (live ? 'Стоп' : s.ph==='over' ? 'Реванш' : 'Старт') + '</button>' +
+      '<button type="button" data-c="swap">Сменить игроков</button>' +
+      [15,30,60].map(d => '<button type="button" data-c="dur" data-v="' + d + '" aria-pressed="' + (s.dur===d) + '">' + d + ' с</button>').join('') +
+    '</div>' +
+    '<button type="button" data-c="hideBar" data-v="' + (s.hideBar ? '0' : '1') + '">' + (s.hideBar ? '👁 Показать кнопки на экране игры' : '🙈 Скрыть кнопки с экрана игры (для эфира)') + '</button>' +
+    '<h3>Играют сейчас</h3>' + playing +
+    '<h3>Очередь · пущены (' + queue.length + ')</h3>' + (queue.length ? queue.map(x => row(x, b('kick', x.id, 'Убрать'))).join('') : '<div class="pn-empty">Пусто</div>') +
+    (s.stream ? '<h3>Ждут допуска (' + wait.length + ')</h3>' + (wait.length ? wait.map(x => row(x, b('ok', x.id, 'Пустить играть', 'pn-ok') + b('kick', x.id, 'Убрать') + b('ban', x.id, 'Бан', 'pn-bad'))).join('') : '<div class="pn-empty">Пока никто не ждёт. Зрители заходят по QR-коду с экрана.</div>') : '');
+}
+setInterval(() => {
+  if (mode !== 'host') return;
+  const st = panelState();
+  if (chan) chan.postMessage({t:'state', s:st});
+  if (!$('drawer').hidden) renderPanel($('drawerBody'), st, hostCmd);
+  const w = waitingList().filter(p => p.connected).length;
+  $('hPanel').textContent = '👥 Игроки' + (w ? ' · ждут ' + w : '');
+}, 300);
+if (chan) chan.onmessage = e => { const d = e.data; if (mode === 'host' && d && d.t === 'cmd') hostCmd(d); };
+$('hPanel').onclick = () => {
+  let w = null;
+  try{ w = window.open(location.pathname + '?panel=1', 'gavpanel', 'width=460,height=860'); }catch(e){}
+  if (!w || !chan){ $('drawer').hidden = false; renderPanel($('drawerBody'), panelState(), hostCmd); }
+};
+$('drawerClose').onclick = () => { $('drawer').hidden = true; };
+function panelStart(){
+  mode = 'panel'; show('panelPage'); document.title = 'Панель · Кто кого перегавкает';
+  if (!chan){ $('panelBody').innerHTML = '<p class="err">Этот браузер не поддерживает отдельное окно панели. Нажми «👥 Игроки» на экране игры и управляй оттуда.</p>'; return; }
+  let last = 0;
+  chan.onmessage = e => { const d = e.data; if (d && d.t === 'state'){ last = Date.now(); renderPanel($('panelBody'), d.s, cmd => chan.postMessage(Object.assign({t:'cmd'}, cmd))); } };
+  setInterval(() => { if (Date.now() - last > 3000){ $('panelBody')._key = ''; $('panelBody').innerHTML = '<p class="sub">Нет связи с экраном игры. Открой «Экран для эфира TikTok» в этом же браузере.</p>'; } }, 1500);
+}
 
 /* ---------- звуки (мягкие) ---------- */
 const Snd = {
@@ -686,8 +833,8 @@ function tag(c, x, y, u, p, side, empty){
   const col = side==='L' ? '#ff9f43' : '#4cc9f0';
   c.textAlign = 'center'; c.textBaseline = 'middle';
   if (empty){
-    c.fillStyle = 'rgba(245,239,230,.7)'; c.font = `600 ${30*u}px Rubik, sans-serif`; c.fillText('Ждём игрока…', x, y);
-    c.font = `400 ${22*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.5)'; c.fillText('сканируй QR-код', x, y+34*u); return;
+    c.fillStyle = 'rgba(245,239,230,.7)'; c.font = `600 ${30*u}px Rubik, sans-serif`; c.fillText(streamMode ? 'Ждём донатера…' : 'Ждём игрока…', x, y);
+    c.font = `400 ${22*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.5)'; c.fillText(streamMode ? 'подарок → ник в чат → QR' : 'сканируй QR-код', x, y+34*u); return;
   }
   c.font = `800 ${40*u}px Rubik, sans-serif`;
   const tw = c.measureText(p.nick).width + 56*u;
@@ -706,7 +853,7 @@ function hostFrame(){
   if (!(mode==='host'||mode==='train')) return;
   requestAnimationFrame(hostFrame);
   const t = now(), dt = Math.min(0.05, (t-lastT)/1000); lastT = t;
-  hostTick(dt); if (mode==='host') broadcast();
+  hostTick(dt); if (mode==='host'){ broadcast(); updateAudio(); }
   if (!SC) resizeStage();
   const {c, w, h} = SC, u = Math.min(w/1600, h/900), gy = h*0.74, ts = t/1000;
   if (!bg) bg = buildBg(w, h);
@@ -720,8 +867,10 @@ function hostFrame(){
   posShow += (G.pos - posShow) * Math.min(1, dt*10);
   const bx = mid + posShow*half;
   c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.roundRect ? c.roundRect(tx0-6*u, ty-18*u, tx1-tx0+12*u, 36*u, 18*u) : c.rect(tx0,ty-18*u,tx1-tx0,36*u); c.fill();
-  c.fillStyle = '#ff9f43'; c.fillRect(tx0, ty-12*u, Math.max(0, bx-tx0), 24*u);
-  c.fillStyle = '#4cc9f0'; c.fillRect(bx, ty-12*u, Math.max(0, tx1-bx), 24*u);
+  c.fillStyle = 'rgba(245,239,230,.12)'; c.fillRect(tx0, ty-12*u, tx1-tx0, 24*u);
+  c.fillStyle = bx < mid ? '#ff9f43' : '#4cc9f0'; c.fillRect(Math.min(bx, mid), ty-12*u, Math.abs(bx-mid), 24*u);
+  c.font = `800 ${20*u}px Rubik, sans-serif`; c.textAlign='center'; c.textBaseline='middle';
+  c.fillStyle = '#ff9f43'; c.fillText('◀', tx0 - 26*u, ty); c.fillStyle = '#4cc9f0'; c.fillText('▶', tx1 + 26*u, ty);
   c.fillStyle = 'rgba(245,239,230,.8)'; c.fillRect(mid-1.5*u, ty-22*u, 3*u, 44*u);
   // косточка
   c.save(); c.translate(bx, ty - 2*u + Math.sin(ts*8)*2*u); c.rotate(Math.sin(ts*3)*0.08);
@@ -773,10 +922,10 @@ function hostFrame(){
     c.font = `400 ${24*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.65)';
     c.fillText('Лайте отрывисто: «ГАВ! ГАВ!» Долгий крик не считается', w/2, 300*u);
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
-    const msg = !L || !R ? 'Сканируйте QR-код и выберите собаку' : (!micOk(L)||!micOk(R)) ? 'Ждём, пока оба включат микрофон' : (!L.rdy||!R.rdy) ? 'Нажмите «Я готов» на телефонах' : '';
+    const msg = !L || !R ? (streamMode ? 'Задонать, напиши ник в чат и сканируй QR-код' : 'Сканируйте QR-код и выберите собаку') : (!micOk(L)||!micOk(R)) ? 'Ждём, пока оба включат микрофон' : (!L.rdy||!R.rdy) ? 'Нажмите «Я готов» на телефонах' : '';
     c.fillText(msg, w/2, 225*u);
-    const qn = [...players.values()].filter(p=>p.connected && p.id!==G.L && p.id!==G.R).length;
-    if (qn){ c.font = `400 ${22*u}px Rubik, sans-serif`; c.fillText('В очереди: ' + qn, w/2, 262*u); }
+    const qn = approvedQueue().length;
+    if (qn && !streamMode){ c.font = `400 ${22*u}px Rubik, sans-serif`; c.fillText('В очереди: ' + qn, w/2, 262*u); }
   } else if (G.ph === 'count'){
     const e = (t-G.cntAt)/1000, n = 3 - Math.floor(e);
     c.fillStyle = 'rgba(20,22,31,.35)'; c.fillRect(0,0,w,h);
@@ -798,6 +947,18 @@ function hostFrame(){
     if (wp){ c.font = `800 ${56*u}px Rubik, sans-serif`; c.fillStyle = '#f5efe6'; c.fillText(wp.nick + ' перегавкал(а)!', w/2, 195*u); }
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle='rgba(245,239,230,.8)';
     c.fillText('Реванш: «Ещё раунд» на телефонах или кнопка «Реванш»', w/2, 255*u);
+  }
+  // плашка для эфира
+  if (streamMode){
+    const next = approvedQueue().slice(0, 3).map(p => p.nick);
+    const cw = Math.min(w*0.26, 420*u), cx0 = w - cw - Math.max(w*0.02, 16), cy0 = h*0.03, lh = 30*u;
+    const lines = [['🎁 ХОЧЕШЬ СЫГРАТЬ?', `800 ${26*u}px Rubik, sans-serif`, '#f2b33d'], ['Отправь подарок', `600 ${22*u}px Rubik, sans-serif`, '#f5efe6'], ['и напиши свой ник в чат', `600 ${22*u}px Rubik, sans-serif`, '#f5efe6']];
+    if (next.length){ lines.push(['Следующие:', `600 ${20*u}px Rubik, sans-serif`, 'rgba(245,239,230,.65)']); next.forEach((n,i) => lines.push([(i+1) + '. ' + n, `800 ${22*u}px Rubik, sans-serif`, '#5bd28a'])); }
+    const ch = 24*u + lines.length*lh;
+    c.fillStyle = 'rgba(20,22,31,.78)'; c.beginPath(); c.roundRect ? c.roundRect(cx0, cy0, cw, ch, 18*u) : c.rect(cx0, cy0, cw, ch); c.fill();
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    lines.forEach((ln, i) => { c.font = ln[1]; c.fillStyle = ln[2]; let tx = ln[0]; while (c.measureText(tx).width > cw - 36*u && tx.length > 3) tx = tx.slice(0, -2) + '…'; c.fillText(tx, cx0 + 18*u, cy0 + 12*u + lh*(i+0.5)); });
+    c.textAlign = 'center';
   }
   // конфетти
   for (let i=confetti.length-1;i>=0;i--){ const f = confetti[i]; f.x += f.vx*dt; f.y += f.vy*dt; f.rot += dt*5; if (f.y>1.1){ confetti.splice(i,1); continue; }
@@ -852,11 +1013,23 @@ function openConn(){
   conn.on('open', () => {
     clearTimeout(timer); net.conn = conn; setNet('● на связи', true);
     send({t:'hello', id:clientId, nick:store.get('nick','Игрок'), skin:mySkin, mic: Mic.status==='on' ? 'ok' : Mic.status});
+    setTimeout(startCall, 300);
   });
   conn.on('data', playerMsg);
   conn.on('close', () => { if (net.conn === conn){ net.conn = null; if (!net.bye){ setNet('Связь потеряна…', false); scheduleRetry(); } } });
   conn.on('error', () => {});
 }
+function startCall(){
+  if (mode !== 'player' || !net.peer || !net.peer.open || !net.conn || !Mic.stream || !Mic.active) return;
+  if (net.call && net.call.open && net.callStream === Mic.stream) return;
+  try{ if (net.call) net.call.close(); }catch(e){}
+  try{
+    net.callStream = Mic.stream;
+    net.call = net.peer.call(ID_PREFIX + net.code.toLowerCase(), Mic.stream, {metadata:{id:clientId}});
+    if (net.call){ net.call.on('close', () => { net.call = null; }); net.call.on('error', () => { net.call = null; }); }
+  }catch(e){ net.call = null; }
+}
+setInterval(() => { if (mode==='player' && net.conn && Mic.active && !(net.call && net.call.open)) startCall(); }, 4000);
 function scheduleRetry(){ clearTimeout(net.retry); if (net.bye) return; net.retry = setTimeout(connectPlayer, 2500); }
 function setNet(t, ok){ $('pNet').textContent = t; $('pNet').style.color = ok ? 'var(--ok)' : 'var(--bad)'; }
 let lastSendV = 0;
@@ -864,10 +1037,15 @@ setInterval(() => { if (mode==='player' && net.conn){ send({t:'v', p:+Mic.power.
 function playerMsg(d){
   if (!d || typeof d !== 'object') return;
   if (d.t === 'bye'){
-    net.bye = true; try{ net.conn && net.conn.close(); }catch(e){}
-    $('pRole').textContent = 'Спасибо за игру!'; $('pState').textContent = ''; $('pNote').textContent = 'Ведущий позвал следующих игроков.';
-    $('pGame').hidden = true; $('rdyBtn').textContent = 'Встать в очередь снова'; $('rdyBtn').disabled = false; $('rdyBtn').classList.remove('on');
-    $('rdyBtn').onclick = () => { net.bye = false; $('rdyBtn').onclick = rdyClick; connectPlayer(); };
+    net.bye = true; try{ net.conn && net.conn.close(); }catch(e){} try{ net.call && net.call.close(); }catch(e){}
+    const why = d.why || 'swap';
+    $('pRole').textContent = why==='ban' ? 'Вход закрыт' : why==='kick' ? 'Тебя убрали из списка' : 'Спасибо за игру!';
+    $('pState').textContent = '';
+    $('pNote').textContent = why==='ban' ? 'Ведущий закрыл тебе вход в эту комнату.' : why==='kick' ? 'Ведущий убрал тебя из зала ожидания.' : 'Ведущий позвал следующих игроков.';
+    $('pGame').hidden = true; $('rdyBtn').classList.remove('on');
+    if (why === 'ban'){ $('rdyBtn').hidden = true; }
+    else { $('rdyBtn').hidden = false; $('rdyBtn').textContent = 'Войти снова'; $('rdyBtn').disabled = false;
+      $('rdyBtn').onclick = () => { net.bye = false; $('rdyBtn').onclick = rdyClick; connectPlayer(); }; }
     pSt = null; return;
   }
   if (d.t !== 'st') return;
@@ -882,11 +1060,12 @@ function playerMsg(d){
 function renderPlayer(){
   const d = pSt; if (!d) return;
   const me = d.you==='L' ? d.L : d.you==='R' ? d.R : null, them = d.you==='L' ? d.R : d.you==='R' ? d.L : null;
-  const sideName = d.you==='L' ? 'Ты слева 🟠' : d.you==='R' ? 'Ты справа 🔵' : 'Ты в очереди №' + d.qpos;
+  const sideName = d.you==='L' ? 'Ты слева 🟠' : d.you==='R' ? 'Ты справа 🔵' : d.you==='W' ? 'Зал ожидания' : 'Ты в очереди №' + d.qpos;
   $('pRole').textContent = sideName;
-  $('pGame').hidden = !(d.you!=='Q' && (d.ph==='play' || d.ph==='over' || d.ph==='count'));
+  $('pGame').hidden = !((d.you==='L' || d.you==='R') && (d.ph==='play' || d.ph==='over' || d.ph==='count'));
   let state = '', note = '';
-  if (d.you === 'Q'){ state = 'Скоро твоя очередь'; note = 'Смотри на экран и готовь голос.'; }
+  if (d.you === 'W'){ state = 'Ждёшь допуска'; note = 'Отправь подарок стримеру в TikTok и напиши в чат свой ник: «' + store.get('nick','') + '». Стример пустит тебя в игру.'; }
+  else if (d.you === 'Q'){ state = d.stream ? 'Тебя пустили! 🎉' : 'Скоро твоя очередь'; note = 'Ты в очереди №' + d.qpos + '. Смотри эфир и готовь голос.'; }
   else if (d.ph === 'lobby'){
     if (Mic.status !== 'on'){ state = 'Включи микрофон'; note = 'Без него собака не сможет лаять.'; }
     else if (!them){ state = me && me.r ? 'Ждём соперника' : 'Нажми «Я готов»'; note = 'Соперник ещё не подключился.'; }
@@ -904,19 +1083,24 @@ function renderPlayer(){
   }
   $('pState').textContent = state; $('pNote').textContent = note;
   if (!$('pGame').hidden){
-    const myPull = d.you==='L' ? -d.pos : d.pos; // >0 — косточка у меня
-    const leftPct = (1 + (d.you==='L' ? -d.pos : d.pos)) / 2 * 100; // слева всегда «я»
-    $('pTugL').style.width = leftPct.toFixed(1)+'%'; $('pBone').style.left = leftPct.toFixed(1)+'%';
-    $('pTugL').style.background = d.you==='L' ? 'var(--left)' : 'var(--right)';
-    $('pTugL').parentElement.style.background = d.you==='L' ? 'var(--right)' : 'var(--left)';
-    $('pMe').textContent = 'Я: ' + (me?me.b:0); $('pThem').textContent = (them?them.n:'') + ': ' + (them?them.b:0);
+    // как на телевизоре: левый игрок слева, правый справа, косточка едет к лидеру
+    const bone = (1 + d.pos) / 2 * 100;
+    $('pBone').style.left = bone.toFixed(1)+'%';
+    $('pTugL').style.left = Math.min(bone, 50).toFixed(1)+'%';
+    $('pTugL').style.width = Math.abs(bone - 50).toFixed(1)+'%';
+    $('pTugL').style.background = d.pos < 0 ? 'var(--left)' : 'var(--right)';
+    const nm = (x, side) => (x ? x.n : '—') + (d.you===side ? ' (ты)' : '') + ' · ' + (x ? x.b : 0);
+    $('pNameL').textContent = '◀ ' + nm(d.L, 'L'); $('pNameR').textContent = nm(d.R, 'R') + ' ▶';
     $('pTime').textContent = d.ph==='play' ? Math.ceil(d.rem) + ' с' : '';
+    const mine = d.you==='L' ? -d.pos : d.pos;
+    $('pLead').textContent = Math.abs(d.pos) < 0.03 ? 'Ровно' : mine > 0 ? 'Ты ведёшь! 🦴' : 'Соперник ведёт, гавкай!';
+    $('pLead').style.color = Math.abs(d.pos) < 0.03 ? 'var(--muted)' : mine > 0 ? 'var(--ok)' : 'var(--bad)';
   }
   updateReadyBtn();
 }
 function updateReadyBtn(){
   const b = $('rdyBtn'), d = pSt; if (net.bye) return;
-  if (!d || d.you === 'Q' || d.ph === 'count' || d.ph === 'play'){ b.hidden = true; return; }
+  if (!d || d.you === 'Q' || d.you === 'W' || d.ph === 'count' || d.ph === 'play'){ b.hidden = true; return; }
   b.hidden = false; b.onclick = rdyClick;
   const me = d.you==='L' ? d.L : d.R, r = !!(me && me.r);
   b.disabled = Mic.status !== 'on';
@@ -937,12 +1121,15 @@ function playerFrame(){
 }
 
 /* ================== старт ================== */
-$('goHost').onclick = () => hostStart(false);
+$('goHost').onclick = () => hostStart(false, false);
+$('goStream').onclick = () => hostStart(false, true);
 $('goJoin').onclick = () => joinScreen('');
-$('goTrain').onclick = () => hostStart(true);
+$('goTrain').onclick = () => hostStart(true, false);
 (function boot(){
   let room = '';
-  try{ room = cleanCode(new URLSearchParams(location.search).get('room')); }catch(e){}
+  let qs = null; try{ qs = new URLSearchParams(location.search); }catch(e){}
+  if (qs && qs.get('panel')) return panelStart();
+  room = qs ? cleanCode(qs.get('room')) : '';
   if (room) joinScreen(room);
 })();
 </script>
