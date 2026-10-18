@@ -64,8 +64,10 @@ h1,h2{margin:0;text-wrap:balance}
 #pDog{width:100%;max-width:360px;aspect-ratio:1.25/1;align-self:center}
 .pstate{font-family:var(--display);font-size:clamp(22px,7vw,34px);text-align:center;line-height:1.1;min-height:1.2em}
 .pnote{text-align:center;color:var(--muted);min-height:1.4em}
-.tug{height:22px;border-radius:11px;position:relative;overflow:hidden;background:var(--card2)}
-.tug i{position:absolute;top:0;bottom:0;left:50%;width:0;background:var(--left)}
+.tug-wrap{position:relative;padding:22px 0}
+.tug{height:22px;border-radius:11px;position:relative;overflow:hidden;background:var(--right)}
+.tug i{position:absolute;top:0;bottom:0;left:0;width:50%;background:var(--left)}
+#pHead{position:absolute;top:50%;width:44px;height:44px;transform:translate(-50%,-56%);pointer-events:none}
 .tug::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--cream);opacity:.6}
 .lead{text-align:center;font-weight:800;font-size:18px;min-height:1.3em}
 .tug em{position:absolute;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;font-style:normal;font-size:22px;line-height:30px;text-align:center}
@@ -159,7 +161,7 @@ h1,h2{margin:0;text-wrap:balance}
     <div class="pstate" id="pState"></div>
     <div class="pnote" id="pNote"></div>
     <div id="pGame" hidden class="card" style="gap:8px">
-      <div class="tug"><i id="pTugL"></i><em id="pBone">🦴</em></div>
+      <div class="tug-wrap"><div class="tug"><i id="pTugL"></i></div><canvas id="pHead" width="160" height="160"></canvas></div>
       <div class="stats"><span id="pNameL" style="color:var(--left)"></span><span id="pTime"></span><span id="pNameR" style="color:var(--right)"></span></div>
       <div class="lead" id="pLead"></div>
     </div>
@@ -253,7 +255,7 @@ function ell(c,x,y,rx,ry){ c.beginPath(); c.ellipse(x,y,rx,ry,0,0,Math.PI*2); }
 function rr(c,x,y,w,h,r){ c.beginPath(); c.roundRect ? c.roundRect(x,y,w,h,r) : c.rect(x,y,w,h); c.fill(); }
 function tri(c,a,b,d,e,f,g,col){ c.fillStyle=col; c.beginPath(); c.moveTo(a,b); c.lineTo(d,e); c.lineTo(f,g); c.closePath(); c.fill(); }
 // x,y — точка на земле под собакой; s — масштаб (собака ~200 единиц длиной); open 0..1 — пасть
-function drawDog(c, x, y, s, sk, open, t, flip){
+function drawDog(c, x, y, s, sk, open, t, flip, angry){
   c.save(); c.translate(x, y); c.scale(flip ? -s : s, s);
   c.fillStyle = 'rgba(0,0,0,.28)'; ell(c, 0, 0, 74, 8); c.fill();
   c.fillStyle = sk.dark; rr(c,-52,-46,18,46,8); rr(c,18,-46,18,46,8);
@@ -269,8 +271,12 @@ function drawDog(c, x, y, s, sk, open, t, flip){
   c.fillStyle = sk.light; ell(c,34,-47,34,18); c.fill();
   c.fillStyle = sk.body; ell(c,52,-86,26,32); c.fill();
   c.fillStyle = sk.light; ell(c,63,-72,15,20); c.fill();
-  // голова
   c.save(); c.translate(70,-110); c.rotate(-open*0.22);
+  drawHead(c, sk, open, angry);
+  c.restore(); c.restore();
+}
+// голова собаки в своих координатах: центр головы в (0,0), морда смотрит вправо
+function drawHead(c, sk, open, angry){
   tri(c,-20,-14,-8,-46,4,-20,sk.body); tri(c,-14,-19,-8,-37,-1,-21,sk.inner);
   tri(c,4,-22,16,-48,24,-14,sk.body); tri(c,9,-22,16,-38,20,-17,sk.inner);
   c.fillStyle = sk.body; c.beginPath(); c.arc(0,0,28,0,Math.PI*2); c.fill();
@@ -283,10 +289,29 @@ function drawDog(c, x, y, s, sk, open, t, flip){
   c.save(); c.translate(18,10); c.rotate(a); c.fillStyle=sk.light; ell(c,15,2,18,6); c.fill(); c.restore();
   c.fillStyle = sk.light; ell(c,30,1,21,10); c.fill();
   c.fillStyle = sk.nose; c.beginPath(); c.arc(50,-2,5.5,0,Math.PI*2); c.fill();
-  c.fillStyle = sk.eye; c.beginPath(); c.arc(13,-8,3.8,0,Math.PI*2); c.fill();
-  c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(14.3,-9.3,1.2,0,Math.PI*2); c.fill();
-  c.fillStyle = sk.light; ell(c,10,-17,4,2.4); c.fill();
-  c.restore(); c.restore();
+  if (angry){
+    // оскал: клыки сверху и снизу
+    if (open > 0.12){
+      c.fillStyle = '#fffaf0';
+      for (const fx of [28, 40]) tri(c, fx-2.5, 9, fx+2.5, 9, fx, 16, '#fffaf0');
+      c.save(); c.translate(18,10); c.rotate(a);
+      for (const fx of [14, 24]) tri(c, fx-2.2, -3, fx+2.2, -3, fx, -9, '#fffaf0');
+      c.restore();
+    }
+    // морщины на носу
+    c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(27,-5); c.quadraticCurveTo(31,-9,35,-5); c.stroke();
+    c.beginPath(); c.moveTo(34,-6); c.quadraticCurveTo(38,-10,42,-6); c.stroke();
+    // прищуренный злой глаз и нахмуренная бровь
+    c.fillStyle = sk.eye; ell(c,13,-7,4.2,2.4); c.fill();
+    c.fillStyle = '#ffdf6e'; ell(c,14,-7.4,1.4,1); c.fill();
+    c.strokeStyle = sk.nose; c.lineWidth = 4.5;
+    c.beginPath(); c.moveTo(2,-19); c.lineTo(23,-10); c.stroke();
+  } else {
+    c.fillStyle = sk.eye; c.beginPath(); c.arc(13,-8,3.8,0,Math.PI*2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(14.3,-9.3,1.2,0,Math.PI*2); c.fill();
+    c.fillStyle = sk.light; ell(c,10,-17,4,2.4); c.fill();
+  }
 }
 // где у собаки пасть в координатах экрана
 function mouthPos(x, y, s, flip, open){ return {x: x + (flip?-1:1)*122*s, y: y - (112 + open*6)*s}; }
@@ -882,27 +907,43 @@ function hostFrame(){
   $('hStart').disabled = !(G.ph==='play'||G.ph==='count') && !canStart();
   const L = slotP('L'), R = slotP('R');
   // дорожка с косточкой
-  const tx0 = w*0.33, tx1 = w*0.67, ty = gy + 40*u, mid = (tx0+tx1)/2, half = (tx1-tx0)/2;
+  const tx0 = w*0.3, tx1 = w*0.7, ty = gy + 44*u, mid = (tx0+tx1)/2, half = (tx1-tx0)/2;
   posShow += (G.pos - posShow) * Math.min(1, dt*10);
   const bx = mid + posShow*half;
-  c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.roundRect ? c.roundRect(tx0-6*u, ty-18*u, tx1-tx0+12*u, 36*u, 18*u) : c.rect(tx0,ty-18*u,tx1-tx0,36*u); c.fill();
-  c.fillStyle = 'rgba(245,239,230,.12)'; c.fillRect(tx0, ty-12*u, tx1-tx0, 24*u);
-  c.fillStyle = bx > mid ? '#ff9f43' : '#4cc9f0'; c.fillRect(Math.min(bx, mid), ty-12*u, Math.abs(bx-mid), 24*u);
-  c.fillStyle = 'rgba(245,239,230,.8)'; c.fillRect(mid-1.5*u, ty-22*u, 3*u, 44*u);
-  // косточка
-  c.save(); c.translate(bx, ty - 2*u + Math.sin(ts*8)*2*u); c.rotate(Math.sin(ts*3)*0.08);
-  c.fillStyle = '#fbf3e4'; c.strokeStyle='#14161f'; c.lineWidth = 3*u;
-  const bw = 46*u, br = 13*u;
-  c.beginPath(); c.rect(-bw, -8*u, bw*2, 16*u); c.fill(); c.stroke();
-  for (const sx of [-1,1]) for (const sy of [-1,1]){ c.beginPath(); c.arc(sx*bw, sy*8*u, br, 0, Math.PI*2); c.fill(); c.stroke(); }
-  c.beginPath(); c.rect(-bw, -7*u, bw*2, 14*u); c.fill();
+  // территория: слева зона левой собаки (оранжевая), справа правой (голубая), граница — голова лидера
+  const th = 30*u;
+  c.save(); c.beginPath(); c.roundRect ? c.roundRect(tx0, ty-th/2, tx1-tx0, th, th/2) : c.rect(tx0, ty-th/2, tx1-tx0, th); c.clip();
+  c.fillStyle = '#ff9f43'; c.fillRect(tx0, ty-th/2, bx-tx0, th);
+  c.fillStyle = '#4cc9f0'; c.fillRect(bx, ty-th/2, tx1-bx, th);
+  c.fillStyle = 'rgba(0,0,0,.18)'; for (let k=1;k<10;k++) c.fillRect(tx0 + (tx1-tx0)*k/10 - 1*u, ty-th/2, 2*u, th);
   c.restore();
+  c.strokeStyle = 'rgba(20,22,31,.9)'; c.lineWidth = 4*u; c.beginPath(); c.roundRect ? c.roundRect(tx0, ty-th/2, tx1-tx0, th, th/2) : c.rect(tx0, ty-th/2, tx1-tx0, th); c.stroke();
+  c.fillStyle = 'rgba(245,239,230,.85)'; c.fillRect(mid-1.5*u, ty-th/2-8*u, 3*u, th+16*u);
+  const lead = posShow > 0.025 ? 'L' : posShow < -0.025 ? 'R' : null, lp = lead ? slotP(lead) : null;
+  if (lp){
+    // злая голова лидера ползёт в зону соперника и растёт к краю
+    const k = Math.abs(posShow), hs = u*(0.95 + 1.6*k*k + 0.4*k), dir = lead==='L' ? 1 : -1;
+    const shake = G.ph==='play' ? Math.sin(ts*40)*lp.open*3*u : 0;
+    c.save(); c.translate(bx + shake, ty - 6*u*hs/u); c.scale(dir*hs, hs); c.translate(-14, 4);
+    c.fillStyle = 'rgba(0,0,0,.3)'; ell(c, 14, 34, 34, 7); c.fill();
+    drawHead(c, SKINS[lp.skin], clamp(lp.open,0,1), true);
+    c.restore();
+  } else {
+    // ничья: косточка в центре
+    c.save(); c.translate(bx, ty + Math.sin(ts*8)*2*u);
+    c.fillStyle = '#fbf3e4'; c.strokeStyle='#14161f'; c.lineWidth = 3*u;
+    const bw = 34*u, br = 10*u;
+    c.beginPath(); c.rect(-bw, -6*u, bw*2, 12*u); c.fill(); c.stroke();
+    for (const sx of [-1,1]) for (const sy of [-1,1]){ c.beginPath(); c.arc(sx*bw, sy*6*u, br, 0, Math.PI*2); c.fill(); c.stroke(); }
+    c.beginPath(); c.rect(-bw, -5*u, bw*2, 10*u); c.fill();
+    c.restore();
+  }
   // собаки
   const ds = 1.75*u, lx = w*0.17, rx = w*0.83;
   for (const [side, p, x, flip] of [['L',L,lx,false],['R',R,rx,true]]){
     const sk = p ? SKINS[p.skin] : GHOST, op = p ? clamp(p.open,0,1) : 0;
     const lean = side==='L' ? G.pos : -G.pos; // косточка у соперника — собака радостнее
-    drawDog(c, x, gy + 20*u, ds*(1 + Math.max(0,lean)*0.06), sk, op, ts + (side==='L'?0:1.3), flip);
+    drawDog(c, x, gy + 20*u, ds*(1 + Math.max(0,lean)*0.06), sk, op, ts + (side==='L'?0:1.3), flip, !!p && lean > 0.05 && G.ph !== 'lobby');
     // звуковые волны
     if (p && op > 0.15){
       const m = mouthPos(x, gy+20*u, ds, flip, op), dir = flip ? -1 : 1;
@@ -912,7 +953,7 @@ function hostFrame(){
         c.globalAlpha = (1-ph)*0.9; c.beginPath(); c.arc(m.x, m.y, r, dir>0 ? -0.6 : Math.PI-0.6, dir>0 ? 0.6 : Math.PI+0.6); c.stroke(); }
       c.globalAlpha = 1;
     }
-    tag(c, x, gy + 84*u, u, p, side, !p);
+    tag(c, x, gy + 88*u, u, p, side, !p);
   }
   // всплывающие ГАВ!
   for (let i=pops.length-1;i>=0;i--){
@@ -937,7 +978,7 @@ function hostFrame(){
     c.fillStyle = '#f2b33d'; c.fillText('ПЕРЕГАВКАЕТ', w/2, 165*u);
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
     c.font = `400 ${24*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.65)';
-    c.fillText('Лай толкает косточку к сопернику. Дотолкал до края — победил!', w/2, 300*u);
+    c.fillText('Гавкай громче — твоя собака захватывает зону соперника. Дошёл до края — победил!', w/2, 300*u);
     c.fillText('Считается только отрывистое «ГАВ! ГАВ!», долгий крик — нет', w/2, 332*u);
     c.font = `600 ${28*u}px Rubik, sans-serif`; c.fillStyle = 'rgba(245,239,230,.8)';
     const msg = !L || !R ? (streamMode ? 'Задонать, напиши ник в чат и сканируй QR-код' : 'Сканируйте QR-код и выберите собаку') : (!micOk(L)||!micOk(R)) ? 'Ждём, пока оба включат микрофон' : (!L.rdy||!R.rdy) ? 'Нажмите «Я готов» на телефонах' : '';
@@ -1092,7 +1133,7 @@ function renderPlayer(){
   } else if (d.ph === 'count'){
     state = d.cnt > 1.1 ? 'ТИШИНА… ' + Math.ceil(d.cnt) : 'ПРИГОТОВЬСЯ!'; note = 'Не шуми, измеряем шум зала.';
   } else if (d.ph === 'play'){
-    state = 'ЛАЙ!!!'; note = 'Толкай косточку к сопернику: коротко и громко ГАВ! ГАВ!';
+    state = 'ЛАЙ!!!'; note = 'Захватывай зону соперника: коротко и громко ГАВ! ГАВ!';
     if (pFlash && now() - pFlash.t < 700){ state = pFlash.ok ? 'ГАВ! ✔' : 'Это не гав!'; note = pFlash.ok ? 'Засчитано, ещё!' : 'Слишком долго. Лай коротко: ГАВ!'; }
   }
   else if (d.ph === 'over'){
@@ -1103,15 +1144,18 @@ function renderPlayer(){
   if (!$('pGame').hidden){
     // как на телевизоре: левый игрок слева, правый справа, косточка едет к лидеру
     const bone = (1 + d.pos) / 2 * 100;
-    $('pBone').style.left = bone.toFixed(1)+'%';
-    $('pTugL').style.left = Math.min(bone, 50).toFixed(1)+'%';
-    $('pTugL').style.width = Math.abs(bone - 50).toFixed(1)+'%';
-    $('pTugL').style.background = d.pos > 0 ? 'var(--left)' : 'var(--right)';
+    $('pTugL').style.width = bone.toFixed(1)+'%';
+    const hc = $('pHead'), k = Math.abs(d.pos), size = 40 + 46*k;
+    hc.style.left = bone.toFixed(1)+'%'; hc.style.width = hc.style.height = size.toFixed(0)+'px';
+    const cx = hc.getContext('2d'); cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,160,160);
+    const ld = d.pos > 0.025 ? d.L : d.pos < -0.025 ? d.R : null;
+    if (ld){ cx.translate(80, 88); cx.scale(d.pos > 0 ? 1.55 : -1.55, 1.55); cx.translate(-14, 4); drawHead(cx, SKINS[skinIdx(ld.s)], d.ph==='play' ? 0.35 : 0.1, true); }
+    else { cx.font = '90px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('🦴', 80, 84); }
     const nm = (x, side) => (x ? x.n : '—') + (d.you===side ? ' (ты)' : '') + ' · ' + (x ? x.b : 0);
     $('pNameL').textContent = nm(d.L, 'L'); $('pNameR').textContent = nm(d.R, 'R');
     $('pTime').textContent = d.ph==='play' ? Math.ceil(d.rem) + ' с' : '';
     const mine = d.you==='L' ? d.pos : -d.pos;
-    $('pLead').textContent = Math.abs(d.pos) < 0.03 ? 'Ровно' : mine > 0 ? 'Ты ведёшь! 🦴' : 'Соперник ведёт, гавкай!';
+    $('pLead').textContent = Math.abs(d.pos) < 0.03 ? 'Ровно' : mine > 0 ? 'Ты давишь! Захватываешь его зону 😈' : 'Соперник давит, гавкай громче!';
     $('pLead').style.color = Math.abs(d.pos) < 0.03 ? 'var(--muted)' : mine > 0 ? 'var(--ok)' : 'var(--bad)';
   }
   updateReadyBtn();
